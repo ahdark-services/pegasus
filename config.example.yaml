@@ -1,0 +1,105 @@
+namespace: "pegasus-bot"
+version: "0.0.1"
+#instance_id: ""
+debug: false
+
+telegram_bot:
+  token: ""
+  webhook:
+    url: ""
+    max_connections: 100
+    ip_address: ""
+    allowed_updates:
+      - "message"
+      - "edited_message"
+      - "channel_post"
+      - "edited_channel_post"
+      - "inline_query"
+      - "chosen_inline_result"
+      - "callback_query"
+      - "shipping_query"
+      - "pre_checkout_query"
+      - "poll"
+      - "poll_answer"
+    drop_pending_updates: false
+    secret_token: ""
+
+logging:
+  caller: true
+  trace_id: true
+  stacktrace: error
+  core:
+    - encoder: console
+      target: stdout
+      level: debug
+
+server:
+  network: "tcp"
+  address: "0.0.0.0"
+  port: 8080
+
+rpc:
+  network: "tcp"
+  address: "0.0.0.0"
+  port: 8888
+
+observability:
+  trace:
+    exporter:
+      type: "otlp-grpc"
+      endpoint: "localhost:4317"
+      timeout: 10s
+      insecure: true
+    batch_timeout: 5s
+    max_batch_entries: 512
+    export_timeout: 30s
+    max_queue_size: 2048
+  metric:
+    reader:
+      type: prometheus
+      listen: "0.0.0.0:9201"
+
+database:
+  type: postgres
+  host: localhost
+  port: 5432
+  username: pegasus
+  password: pegasus
+  name: pegasus
+  charset: utf8mb4
+  sslmode: disable
+  table_prefix: ""
+
+redis:
+  mode: standalone
+  host: redis
+  port: 6379
+  username: ""
+  password: ""
+
+mq:
+  host: localhost
+  port: 5672
+  username: pegasus
+  password: pegasus
+  vhost: ""
+
+etcd:
+  endpoints:
+    - "http://localhost:2379"
+  username: ""
+  password: ""
+  tls:
+    ca_file: ""
+    cert_file: ""
+    key_file: ""
+    insecure_skip_verify: false
+
+consul:
+  address: "localhost:8500"
+  datacenter: "dc1"
+  weight: 10
+  check:
+    interval: 10s
+    method: GET
+    deregister_critical_service_after: 30s
