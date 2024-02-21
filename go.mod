@@ -40,6 +40,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.23.1
 	go.uber.org/fx v1.20.1
 	go.uber.org/zap v1.26.0
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	bs "github.com/AH-dark/bytestring/v2"
 	"github.com/dgraph-io/ristretto"
 	"github.com/pkg/errors"
 	"github.com/shopspring/decimal"

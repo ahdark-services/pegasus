@@ -1,9 +1,10 @@
 package infra
 
 import (
-	cache2 "github.com/ahdark-services/pegasus/pkg/cache"
+	"github.com/ahdark-services/pegasus/pkg/cache"
+	"github.com/redis/go-redis/v9"
 )
 
-func NewCacheDriver(redisClient redis.UniversalClient) cache2.Driver {
-	return cache2.NewRedisDriver(redisClient)
+func NewCacheDriver(redisClient redis.UniversalClient) cache.Driver {
+	return cache.NewRedisDriver(redisClient)
 }
