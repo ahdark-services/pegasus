@@ -26,4 +26,12 @@ func (h *handlers) UpdateHandler(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	if err := h.TransportService.SendUpdate(ctx, update.Update); err != nil {
+		otelzap.L().Ctx(ctx).Error("failed to send update", zap.Error(err))
+		serializer.NewAppResponseError(serializer.CodeErrServiceError, err).
+			AbortWithStatusJSON(c, http.StatusInternalServerError)
+		return
+	}
+
+	serializer.NewAppResponseSuccess(nil).JSON(c)
 }

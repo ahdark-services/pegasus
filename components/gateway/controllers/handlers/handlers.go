@@ -6,6 +6,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/fx"
+
+	"github.com/ahdark-services/pegasus/components/gateway/services/transport"
 )
 
 var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/gateway/handlers")
@@ -16,7 +18,8 @@ type Handlers interface {
 
 type handlers struct {
 	fx.In
-	AMQPChannel *amqp.Channel
+	AMQPChannel      *amqp.Channel
+	TransportService transport.Service
 }
 
 func NewHandlers(h handlers) Handlers {
