@@ -14,18 +14,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ahdark-services/pegasus/constants"
+	"github.com/ahdark-services/pegasus/pkg/utils"
 )
-
-func newWebhookParams(vip *viper.Viper) *telego.SetWebhookParams {
-	return &telego.SetWebhookParams{
-		URL:                vip.GetString("telegram_bot.webhook.url"),
-		IPAddress:          vip.GetString("telegram_bot.webhook.ip_address"),
-		MaxConnections:     vip.GetInt("telegram_bot.webhook.max_connections"),
-		AllowedUpdates:     vip.GetStringSlice("telegram_bot.webhook.allowed_updates"),
-		DropPendingUpdates: vip.GetBool("telegram_bot.webhook.drop_pending_updates"),
-		SecretToken:        vip.GetString("telegram_bot.webhook.secret_token"),
-	}
-}
 
 func declareExchangeAndQueue(ctx context.Context, ch *amqp.Channel) error {
 	ctx, span := tracer.Start(ctx, "telegram_bot.declareExchangeAndQueue")
@@ -99,7 +89,7 @@ func NewUpdatesChannel(
 	}
 
 	consumer := fmt.Sprintf("%s:%s:%s", constants.QueueBotUpdates, serviceName, vip.GetString("instance_id"))
-	msg, err := ch.Consume(
+	msgs, err := ch.Consume(
 		constants.QueueBotUpdates,
 		consumer,
 		false,
@@ -116,17 +106,23 @@ func NewUpdatesChannel(
 	update := make(chan telego.Update)
 	go func() {
 		defer func() {
-			otelzap.L().Panic("telegram bot update channel closed")
+			if err := recover(); err != nil {
+				otelzap.L().Panic("telegram bot update channel closed", zap.Any("error", err))
+			}
 		}()
 
-		for m := range msg {
-			var u telego.Update
-			if err := sonic.Unmarshal(m.Body, &u); err != nil {
-				otelzap.L().Warn("failed to unmarshal message", zap.Error(err))
-				continue
-			}
+		for msg := range msgs {
+			utils.HandleAmqpDelivery(msg, func(ctx context.Context, delivery amqp.Delivery) {
+				var u telego.Update
+				if err := sonic.Unmarshal(delivery.Body, &u); err != nil {
+					otelzap.L().Warn("failed to unmarshal message", zap.Error(err))
+					return
+				}
 
-			update <- u
+				u = u.WithContext(ctx)
+
+				update <- u
+			})
 		}
 	}()
 
