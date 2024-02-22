@@ -13,8 +13,8 @@ import (
 var tracer = otel.Tracer("github.com/ahdark-services/pegasus/internal/config")
 
 var defaultConfig = map[string]interface{}{
-	"name":        "cecilia-card-backend",
-	"namespace":   "cecilia-card-backend",
+	"name":        "pegasus",
+	"namespace":   "pegasus",
 	"version":     "0.0.1",
 	"instance_id": uuid.New(),
 }
