@@ -22,7 +22,7 @@ func NewHandler(bot *telego.Bot, ch <-chan telego.Update, lc fx.Lifecycle) (*tel
 			ctx, span := tracer.Start(ctx, "telegram_bot.StartHandler")
 			defer span.End()
 
-			h.Start()
+			go h.Start()
 
 			return nil
 		},

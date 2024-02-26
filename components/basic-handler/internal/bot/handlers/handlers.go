@@ -9,7 +9,7 @@ import (
 var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/remake-handler/internal/bot/handlers")
 
 type Handlers interface {
-	RemakeCommandHandler(bot *telego.Bot, update telego.Update)
+	StartCommandHandler(bot *telego.Bot, update telego.Update)
 }
 
 type handlers struct {

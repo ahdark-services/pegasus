@@ -1,6 +1,6 @@
 module github.com/ahdark-services/pegasus/components/basic-handler
 
-go 1.21
+go 1.22
 
 require (
 	github.com/mymmrac/telego v0.29.1

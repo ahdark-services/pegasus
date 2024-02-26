@@ -1,10 +1,11 @@
 version: "3.8"
 
-name: pegasus-bot
+name: pegasus-bot-env
 
 networks:
-  app-network:
+  pegasus-network:
     driver: bridge
+    external: true
 
 volumes:
   logs:
@@ -25,7 +26,7 @@ services:
       - "4317:4317"
       - "16686:16686"
     networks:
-      - app-network
+      - pegasus-network
 
   postgres:
     image: postgres:15-alpine
@@ -38,7 +39,7 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - app-network
+      - pegasus-network
 
   redis:
     image: redis:latest
@@ -49,7 +50,7 @@ services:
     volumes:
       - redis-data:/data
     networks:
-      - app-network
+      - pegasus-network
 
   mq:
     image: rabbitmq:management-alpine
@@ -60,7 +61,7 @@ services:
       - "15672:15672"
       - "5672:5672"
     networks:
-      - app-network
+      - pegasus-network
 
   etcd:
     image: quay.io/coreos/etcd:v3.5.9-arm64
@@ -83,7 +84,7 @@ services:
       - "2379:2379"
       - "2380:2380"
     networks:
-      - app-network
+      - pegasus-network
     volumes:
       - etcd-data:/etcd_data
 
@@ -94,4 +95,4 @@ services:
     volumes:
       - consul-data:/consul/data
     networks:
-      - app-network
+      - pegasus-network

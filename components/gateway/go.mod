@@ -1,6 +1,6 @@
 module github.com/ahdark-services/pegasus/components/gateway
 
-go 1.21
+go 1.22
 
 require (
 	github.com/bytedance/sonic v1.11.0

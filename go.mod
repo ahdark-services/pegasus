@@ -1,6 +1,6 @@
 module github.com/ahdark-services/pegasus
 
-go 1.21
+go 1.22
 
 require (
 	github.com/AH-dark/bytestring/v2 v2.0.0
