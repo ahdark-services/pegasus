@@ -1,0 +1,47 @@
+version: "3.8"
+
+name: pegasus-bot
+
+networks:
+  pegasus-network:
+    driver: bridge
+    external: true
+
+services:
+  gateway:
+    image: pegasus-bot/gateway
+    build:
+      context: .
+      dockerfile: docker/basic/Dockerfile
+      args:
+        COMPONENT: "gateway"
+    ports:
+      - "8080:8080"
+    networks:
+      - pegasus-network
+    env_file:
+      - .env
+
+  basic-handler:
+    image: pegasus-bot/basic-handler
+    build:
+      context: .
+      dockerfile: docker/basic/Dockerfile
+      args:
+        COMPONENT: "basic-handler"
+    networks:
+      - pegasus-network
+    env_file:
+      - .env
+
+  remake-handler:
+    image: pegasus-bot/remake-handler
+    build:
+      context: .
+      dockerfile: docker/basic/Dockerfile
+      args:
+        COMPONENT: "remake-handler"
+    networks:
+      - pegasus-network
+    env_file:
+      - .env

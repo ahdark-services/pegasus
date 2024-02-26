@@ -7,5 +7,5 @@ import (
 )
 
 func BindHandlers(r *telegohandler.BotHandler, handlers handlers.Handlers) {
-	r.Handle(handlers.RemakeCommandHandler, telegohandler.And(telegohandler.CommandEqual("start"), utils.PrivateChatOnly()))
+	r.Handle(handlers.StartCommandHandler, telegohandler.And(telegohandler.CommandEqual("start"), utils.PrivateChatOnly()))
 }

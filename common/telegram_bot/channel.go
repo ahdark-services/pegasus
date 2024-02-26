@@ -8,7 +8,6 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/mymmrac/telego"
 	amqp "github.com/rabbitmq/amqp091-go"
-	"github.com/spf13/viper"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -71,7 +70,6 @@ func NewUpdatesChannel(
 	ctx context.Context,
 	serviceName string,
 	conn *amqp.Connection,
-	vip *viper.Viper,
 	lc fx.Lifecycle,
 ) (<-chan telego.Update, error) {
 	ctx, span := tracer.Start(ctx, "telegram_bot.NewUpdatesChannel")
@@ -88,7 +86,7 @@ func NewUpdatesChannel(
 		return nil, err
 	}
 
-	consumer := fmt.Sprintf("%s:%s:%s", constants.QueueBotUpdates, serviceName, vip.GetString("instance_id"))
+	consumer := fmt.Sprintf("%s:%s", constants.QueueBotUpdates, serviceName) // one consumer per service
 	msgs, err := ch.Consume(
 		constants.QueueBotUpdates,
 		consumer,
