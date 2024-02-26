@@ -32,11 +32,6 @@ func NewServer(
 	defer span.End()
 
 	hlog.SetLogger(hertzloggerzap.NewLoggerWithZapLogger(otelzap.L().Named("hertz")))
-	if vip.GetBool("debug") {
-		hlog.SetLevel(hlog.LevelDebug)
-	} else {
-		hlog.SetLevel(hlog.LevelInfo)
-	}
 
 	traceOption, cfg := hertztracing.NewServerTracer()
 	svr := server.Default(
