@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"github.com/ahdark-services/pegasus/components/gateway/controllers/handlers"
+	"github.com/ahdark-services/pegasus/components/gateway/internal/controllers/handlers"
 	"go.uber.org/fx"
 )
 

@@ -5,9 +5,9 @@ import (
 
 	"go.uber.org/fx"
 
-	"github.com/ahdark-services/pegasus/components/gateway/bot"
-	"github.com/ahdark-services/pegasus/components/gateway/controllers"
-	"github.com/ahdark-services/pegasus/components/gateway/services"
+	"github.com/ahdark-services/pegasus/components/gateway/internal/bot"
+	"github.com/ahdark-services/pegasus/components/gateway/internal/controllers"
+	"github.com/ahdark-services/pegasus/components/gateway/internal/services"
 	"github.com/ahdark-services/pegasus/entry"
 )
 

@@ -1,7 +1,7 @@
 package bot
 
 import (
-	"github.com/ahdark-services/pegasus/components/basic-handler/bot/handlers"
+	"github.com/ahdark-services/pegasus/components/basic-handler/internal/bot/handlers"
 	"go.uber.org/fx"
 )
 

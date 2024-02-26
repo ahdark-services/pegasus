@@ -7,8 +7,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func (h *handlers) StartCommandHandler(bot *telego.Bot, update telego.Update) {
-	ctx, span := tracer.Start(update.Context(), "handlers.StartCommandHandler")
+func (h *handlers) RemakeCommandHandler(bot *telego.Bot, update telego.Update) {
+	ctx, span := tracer.Start(update.Context(), "handlers.RemakeCommandHandler")
 	defer span.End()
 
 	if _, err := bot.SendMessage(telegoutil.Message(telegoutil.ID(update.Message.Chat.ID), "Hello!")); err != nil {

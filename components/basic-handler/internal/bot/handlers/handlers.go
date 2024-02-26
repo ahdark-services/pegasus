@@ -6,10 +6,10 @@ import (
 	"go.uber.org/fx"
 )
 
-var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/basic-handler/bot/handlers")
+var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/remake-handler/internal/bot/handlers")
 
 type Handlers interface {
-	StartCommandHandler(bot *telego.Bot, update telego.Update)
+	RemakeCommandHandler(bot *telego.Bot, update telego.Update)
 }
 
 type handlers struct {
