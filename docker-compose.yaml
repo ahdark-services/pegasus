@@ -29,6 +29,8 @@ services:
       dockerfile: docker/basic/Dockerfile
       args:
         COMPONENT: "basic-handler"
+    deploy:
+      replicas: 3
     networks:
       - pegasus-network
     env_file:
@@ -41,6 +43,8 @@ services:
       dockerfile: docker/basic/Dockerfile
       args:
         COMPONENT: "remake-handler"
+    deploy:
+      replicas: 3
     networks:
       - pegasus-network
     env_file:
