@@ -7,10 +7,10 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.uber.org/fx"
 
-	"github.com/ahdark-services/pegasus/components/gateway/services/transport"
+	"github.com/ahdark-services/pegasus/components/gateway/internal/services/transport"
 )
 
-var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/gateway/handlers")
+var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/gateway/internal/handlers")
 
 type Handlers interface {
 	UpdateHandler(ctx context.Context, c *app.RequestContext)

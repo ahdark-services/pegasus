@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/gateway/services/transport")
+var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/gateway/internal/services/transport")
 
 type Service interface {
 	SendUpdate(ctx context.Context, update telego.Update) error
