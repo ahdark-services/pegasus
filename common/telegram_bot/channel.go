@@ -3,6 +3,7 @@ package telegram_bot
 import (
 	"context"
 	"fmt"
+	"github.com/spf13/viper"
 	"reflect"
 
 	"github.com/bytedance/sonic"
@@ -16,7 +17,7 @@ import (
 	"github.com/ahdark-services/pegasus/pkg/utils"
 )
 
-func declareExchangeAndQueue(ctx context.Context, ch *amqp.Channel) error {
+func declareExchangeAndQueue(ctx context.Context, serviceName string, ch *amqp.Channel) error {
 	ctx, span := tracer.Start(ctx, "telegram_bot.declareExchangeAndQueue")
 	defer span.End()
 
@@ -34,7 +35,7 @@ func declareExchangeAndQueue(ctx context.Context, ch *amqp.Channel) error {
 	}
 
 	q, err := ch.QueueDeclare(
-		constants.QueueBotUpdates,
+		fmt.Sprintf("bot_updates:queue.%s", serviceName),
 		false,
 		true,
 		false,
@@ -69,6 +70,7 @@ func init() {
 func NewUpdatesChannel(
 	ctx context.Context,
 	serviceName string,
+	vip *viper.Viper,
 	conn *amqp.Connection,
 	lc fx.Lifecycle,
 ) (<-chan telego.Update, error) {
@@ -81,16 +83,15 @@ func NewUpdatesChannel(
 		return nil, err
 	}
 
-	if err := declareExchangeAndQueue(ctx, ch); err != nil {
+	if err := declareExchangeAndQueue(ctx, serviceName, ch); err != nil {
 		otelzap.L().Ctx(ctx).Error("failed to declare exchange and queue", zap.Error(err))
 		return nil, err
 	}
 
-	consumer := fmt.Sprintf("%s:%s", constants.QueueBotUpdates, serviceName) // one consumer per service
 	msgs, err := ch.Consume(
-		constants.QueueBotUpdates,
-		consumer,
-		false,
+		fmt.Sprintf("bot_updates:queue.%s", serviceName),
+		vip.GetString("instance_id"),
+		true,
 		false,
 		false,
 		false,
@@ -129,7 +130,7 @@ func NewUpdatesChannel(
 			ctx, span := tracer.Start(ctx, "telegram_bot.StopWebhook")
 			defer span.End()
 
-			if err := ch.Cancel(consumer, false); err != nil {
+			if err := ch.Cancel(vip.GetString("instance_id"), false); err != nil {
 				otelzap.L().Ctx(ctx).Error("failed to cancel consumer", zap.Error(err))
 				return err
 			}
