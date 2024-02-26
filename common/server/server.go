@@ -37,8 +37,8 @@ func NewServer(
 	svr := server.Default(
 		traceOption,
 		server.WithRegistry(serviceRegistry, serviceInfo),
-		server.WithNetwork(viper.GetString("server.network")),
-		server.WithHostPorts(fmt.Sprintf("%s:%d", viper.GetString("server.address"), viper.GetInt("server.port"))),
+		server.WithNetwork(vip.GetString("server.network")),
+		server.WithHostPorts(fmt.Sprintf("%s:%d", vip.GetString("server.address"), vip.GetInt("server.port"))),
 		server.WithHandleMethodNotAllowed(true),
 		server.WithTracer(hertzprometheus.NewServerTracer(
 			"",
