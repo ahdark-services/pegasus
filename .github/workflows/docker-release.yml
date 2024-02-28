@@ -62,7 +62,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/${{ github.repository }}/pegasus-${{ matrix.components }}
+          images: ghcr.io/${{ github.repository }}-${{ matrix.components }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
