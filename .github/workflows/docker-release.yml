@@ -24,7 +24,7 @@ jobs:
         run: |
           COMPONENTS=$(ls components)
           JSON_STRING=$(jq -nr --arg items "$COMPONENTS" '$items | split("\n") | map(select(length > 0)) | {components: .}')
-          echo 'components=<<EOF' >> $GITHUB_OUTPUT
+          echo 'components<<EOF' >> $GITHUB_OUTPUT
           echo "$JSON_STRING" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
