@@ -24,7 +24,7 @@ jobs:
         run: |
           COMPONENTS=$(ls components)
           JSON_STRING=$(jq -nr --arg items "$COMPONENTS" '$items | split("\n") | map(select(length > 0)) | {components: .}')
-          echo 'components_json<<EOF' >> $GITHUB_OUTPUT
+          echo 'components=<<EOF' >> $GITHUB_OUTPUT
           echo "$JSON_STRING" >> $GITHUB_OUTPUT
           echo 'EOF' >> $GITHUB_OUTPUT
 
@@ -37,8 +37,7 @@ jobs:
 
     strategy:
       fail-fast: false
-      matrix:
-        component: ${{ fromJson(needs.prepare-components.outputs.components).components }}
+      matrix: ${{ fromJson(needs.prepare-components.outputs.components) }}
 
     permissions:
       contents: 'read'
@@ -58,7 +57,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/${{ github.repository }}/pegasus-${{ matrix.component }}
+          images: ghcr.io/${{ github.repository }}/pegasus-${{ matrix.components }}
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -68,4 +67,4 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          args: COMPONENT=${{ matrix.component }}
+          args: COMPONENT=${{ matrix.components }}
