@@ -23,8 +23,10 @@ jobs:
         shell: bash
         run: |
           COMPONENTS=$(ls components)
-          JSON_STRING=$(jq -n --arg items "$COMPONENTS" '{"components": [$items | split("\n") | .[] | select(length > 0)]}')
-          echo "components=$JSON_STRING" >> $GITHUB_OUTPUT"
+          JSON_STRING=$(jq -nr --arg items "$COMPONENTS" '$items | split("\n") | map(select(length > 0)) | {components: .}')
+          echo 'components_json<<EOF' >> $GITHUB_OUTPUT
+          echo "$JSON_STRING" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
 
   build:
     name: Build
