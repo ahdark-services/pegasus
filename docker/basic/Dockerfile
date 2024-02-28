@@ -27,7 +27,7 @@ ARG COMPONENT
 WORKDIR /app
 
 COPY --from=builder /go/src/github.com/ahdark-services/pegasus/bin/${COMPONENT} /app/entry
-COPY docker/basic/config.yaml /app/config.yaml
+COPY docker/basic/config.yaml* /app/
 
 USER 1000
 EXPOSE 9201
