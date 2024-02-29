@@ -44,7 +44,7 @@ services:
   redis:
     image: redis:latest
     environment:
-      - REDIS_PASSWORD=cecilia
+      - REDIS_PASSWORD=pegasus
     ports:
       - "6379:6379"
     volumes:
