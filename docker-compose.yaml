@@ -49,3 +49,17 @@ services:
       - pegasus-network
     env_file:
       - .env
+
+  any-action-handler:
+    image: pegasus-bot/any-action-handler
+    build:
+      context: .
+      dockerfile: docker/basic/Dockerfile
+      args:
+        COMPONENT: "any-action-handler"
+    deploy:
+      replicas: 3
+    networks:
+      - pegasus-network
+    env_file:
+      - .env
