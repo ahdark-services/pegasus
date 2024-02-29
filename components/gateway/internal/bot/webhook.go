@@ -3,6 +3,8 @@ package bot
 import (
 	"github.com/mymmrac/telego"
 	"github.com/spf13/viper"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 var allowedUpdates = []string{
@@ -38,5 +40,10 @@ func newWebhookParams(vip *viper.Viper) *telego.SetWebhookParams {
 }
 
 func RegisterWebhook(bot *telego.Bot, params *telego.SetWebhookParams) error {
-	return bot.SetWebhook(params)
+	if err := bot.SetWebhook(params); err != nil {
+		otelzap.L().Error("failed to set webhook", zap.Error(err))
+		return err
+	}
+
+	return nil
 }
