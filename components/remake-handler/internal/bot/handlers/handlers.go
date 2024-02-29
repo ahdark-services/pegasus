@@ -8,7 +8,7 @@ import (
 	"github.com/ahdark-services/pegasus/components/remake-handler/internal/services/areas"
 )
 
-var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/basic-handler/internal/bot/handlers")
+var tracer = otel.Tracer("github.com/ahdark-services/pegasus/components/remake-handler/internal/bot/handlers")
 
 type Handlers interface {
 	RemakeCommandHandler(bot *telego.Bot, update telego.Update)
