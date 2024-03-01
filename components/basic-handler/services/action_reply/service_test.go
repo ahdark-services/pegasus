@@ -2,8 +2,9 @@ package action_reply
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestService_CheckNeedReply(t *testing.T) {

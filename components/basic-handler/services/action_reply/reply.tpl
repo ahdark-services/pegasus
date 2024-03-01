@@ -1,0 +1,1 @@
+<a href="tg://user?id={{.Sender.ID}}">{{getFullUserNickname .Sender}}</a> {{.Action}}{{ if eq .Message "" }}了{{ end }} <a href="tg://user?id={{.User.ID}}">{{getFullUserNickname .User}}</a> {{ if ne .Message "" }}{{.Message}}{{ end }}

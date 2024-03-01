@@ -2,11 +2,11 @@ package handlers
 
 import (
 	_ "embed"
-	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/mymmrac/telego"
 	"github.com/mymmrac/telego/telegoutil"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 )
 

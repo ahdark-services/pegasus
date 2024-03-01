@@ -6,6 +6,7 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/ahdark-services/pegasus/components/basic-handler/internal/bot"
+	"github.com/ahdark-services/pegasus/components/basic-handler/services"
 	"github.com/ahdark-services/pegasus/entry"
 )
 
@@ -16,6 +17,7 @@ func main() {
 
 		entry.AppEntries(),
 
+		services.Module(),
 		bot.Module(),
 	)
 
