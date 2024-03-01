@@ -10,6 +10,9 @@ func BindHandlers(r *telegohandler.BotHandler, handlers handlers.Handlers) {
 	// start command
 	r.Handle(handlers.StartCommandHandler, telegohandler.CommandEqual("start"), utils.PrivateChatOnly())
 
+	// id command
+	r.Handle(handlers.IDCommandHandler, telegohandler.CommandEqual("id"))
+
 	// action command
 	r.Handle(handlers.ActionCommandHandler, telegohandler.AnyMessageWithText(), telegohandler.TextPrefix("/"), telegohandler.Not(utils.PrivateChatOnly()))
 }
