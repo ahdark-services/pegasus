@@ -14,10 +14,6 @@ volumes:
     driver: local
   redis-data:
     driver: local
-  etcd-data:
-    driver: local
-  consul-data:
-    driver: local
 
 services:
   jaeger:
@@ -60,39 +56,5 @@ services:
     ports:
       - "15672:15672"
       - "5672:5672"
-    networks:
-      - pegasus-network
-
-  etcd:
-    image: quay.io/coreos/etcd:v3.5.9-arm64
-    entrypoint: /usr/local/bin/etcd
-    command:
-      - --name=etcd
-      - --data-dir=/etcd_data
-      - --initial-advertise-peer-urls=http://etcd:2380
-      - --listen-peer-urls=http://0.0.0.0:2380
-      - --listen-client-urls=http://0.0.0.0:2379
-      - --advertise-client-urls=http://etcd:2379
-      - --initial-cluster-token=etcd-cluster-1
-      - --initial-cluster=etcd=http://etcd:2380
-      - --initial-cluster-state=new
-      - --heartbeat-interval=250
-      - --election-timeout=1250
-      - --experimental-enable-distributed-tracing=true
-      - --experimental-distributed-tracing-address='jaeger:4317'
-    ports:
-      - "2379:2379"
-      - "2380:2380"
-    networks:
-      - pegasus-network
-    volumes:
-      - etcd-data:/etcd_data
-
-  consul:
-    image: consul:1.15
-    ports:
-      - "8500:8500"
-    volumes:
-      - consul-data:/consul/data
     networks:
       - pegasus-network
