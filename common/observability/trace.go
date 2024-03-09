@@ -83,6 +83,7 @@ func NewTraceProvider(
 			tracesdk.WithExportTimeout(vip.GetDuration("observability.trace.export_timeout")),
 			tracesdk.WithMaxQueueSize(vip.GetInt("observability.trace.max_queue_size")),
 		),
+		tracesdk.WithSampler(tracesdk.ParentBased(tracesdk.TraceIDRatioBased(vip.GetFloat64("observability.trace.sampling_ratio")))),
 	)
 
 	lc.Append(fx.Hook{
