@@ -83,23 +83,3 @@ mq:
   username: pegasus
   password: pegasus
   vhost: ""
-
-etcd:
-  endpoints:
-    - "http://localhost:2379"
-  username: ""
-  password: ""
-  tls:
-    ca_file: ""
-    cert_file: ""
-    key_file: ""
-    insecure_skip_verify: false
-
-consul:
-  address: "localhost:8500"
-  datacenter: "dc1"
-  weight: 10
-  check:
-    interval: 10s
-    method: GET
-    deregister_critical_service_after: 30s

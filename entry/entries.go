@@ -4,7 +4,6 @@ import (
 	"go.uber.org/fx"
 
 	"github.com/ahdark-services/pegasus/common/config"
-	"github.com/ahdark-services/pegasus/common/consul"
 	"github.com/ahdark-services/pegasus/common/dcron"
 	"github.com/ahdark-services/pegasus/common/infra"
 	"github.com/ahdark-services/pegasus/common/logging"
@@ -21,7 +20,6 @@ func AppEntries() fx.Option {
 		fx.WithLogger(logging.FxLogger),
 		observability.Module(),
 		settings.Module(),
-		consul.Module(),
 		infra.Module(),
 		dcron.Module(),
 		server.Module(),
