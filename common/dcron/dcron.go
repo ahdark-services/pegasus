@@ -2,23 +2,23 @@ package dcron
 
 import (
 	"context"
+	"github.com/redis/go-redis/v9"
 
 	"github.com/libi/dcron"
 	"github.com/libi/dcron/dlog"
 	"github.com/libi/dcron/driver"
-	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.opentelemetry.io/otel"
 	"go.uber.org/fx"
 )
 
 var tracer = otel.Tracer("github.com/ahdark-services/pegasus/common/dcron")
 
-func NewDCron(ctx context.Context, serviceName string, etcdClient *clientv3.Client, logger dlog.Logger, lc fx.Lifecycle) *dcron.Dcron {
+func NewDCron(ctx context.Context, serviceName string, redisClient redis.UniversalClient, logger dlog.Logger, lc fx.Lifecycle) *dcron.Dcron {
 	ctx, span := tracer.Start(ctx, "dcron.NewDCron")
 	defer span.End()
 
 	d := dcron.NewDcronWithOption(serviceName,
-		driver.NewEtcdDriver(etcdClient),
+		driver.NewRedisDriver(redisClient),
 		dcron.WithLogger(logger),
 	)
 
