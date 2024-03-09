@@ -76,6 +76,7 @@ redis:
   port: 6379
   username: ""
   password: "pegasus"
+  db: 0
 
 mq:
   host: localhost
