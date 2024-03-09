@@ -1,29 +1,38 @@
-use serde::{Deserialize, Serialize};
-use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-pub fn new_settings(s: &str) -> Settings {
-    let settings: Settings = serde_yaml::from_str(s).unwrap_or_default();
-    settings
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct Settings {
+    pub namespace: String,
+    pub version: String,
+    pub instance_id: Option<String>,
+    pub debug: bool,
+    pub telegram_bot: Option<TelegramBot>,
+    pub server: Option<Server>,
+    pub observability: Option<Observability>,
+    pub database: Option<Database>,
+    pub redis: Option<Redis>,
+    pub mq: Option<Mq>,
 }
 
-pub fn read_settings_from_file<P: AsRef<Path>>(
-    path: Option<P>,
-) -> Result<Settings, Box<dyn std::error::Error>> {
-    let file_path = match path {
-        Some(p) => p.as_ref().to_path_buf(),
-        None => env::current_dir()?.join("settings.yaml"),
-    };
+impl Settings {
+    pub fn new(s: &str) -> Settings {
+        let settings: Settings = serde_yaml::from_str(s).unwrap_or_default();
+        settings
+    }
 
-    let mut file = File::open(file_path)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
+    pub fn read_from_file<P: AsRef<Path>>(path: P) -> Result<Settings, Box<dyn std::error::Error>> {
+        let mut file = File::open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
 
-    let settings: Settings = new_settings(&contents);
+        let settings: Settings = Settings::new(&contents);
 
-    Ok(settings)
+        Ok(settings)
+    }
 }
 
 #[test]
@@ -114,28 +123,15 @@ fn test_new_settings() {
               vhost: ""
     "#;
 
-        let settings = new_settings(test_file);
+        let settings = Settings::new(test_file);
         assert_eq!(settings.namespace, "pegasus-bot");
         assert_eq!(settings.version, "0.0.1");
     }
     {
-        let settings = new_settings("");
+        let settings = Settings::new("");
         assert_eq!(settings.namespace, "");
         assert_eq!(settings.version, "");
     }
-}
-
-#[derive(Clone, PartialEq, Serialize, Deserialize, Default)]
-pub struct Settings {
-    pub namespace: String,
-    pub version: String,
-    pub debug: bool,
-    pub telegram_bot: Option<TelegramBot>,
-    pub server: Option<Server>,
-    pub observability: Option<Observability>,
-    pub database: Option<Database>,
-    pub redis: Option<Redis>,
-    pub mq: Option<Mq>,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -211,7 +207,7 @@ pub struct Reader {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Trace {
-    pub exporter: Option<Exporter>,
+    pub exporter: Exporter,
     pub batch_timeout: Option<String>,
     pub max_batch_entries: Option<i64>,
     pub export_timeout: Option<String>,

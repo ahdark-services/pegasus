@@ -6,3 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+pegasus-common = { path = "../../rust-common" }
+
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
+log = { workspace = true }
+opentelemetry = { workspace = true, features = ["trace"] }

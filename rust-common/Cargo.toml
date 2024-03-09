@@ -10,3 +10,10 @@ path = "src/lib.rs"
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_yaml = "0.9"
+opentelemetry = { workspace = true, features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.22", features = ["tokio", "trace", "metrics", "rt-tokio"] }
+opentelemetry-stdout = { version = "0.3", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.15", features = ["http", "http-proto", "grpc-tonic"] }
+opentelemetry-prometheus = "0.15"
+opentelemetry-semantic-conventions = "0.14"
+uuid = { version = "1.7.0", features = ["v4"] }
