@@ -7,7 +7,6 @@ import (
 	hertzloggerzap "github.com/ahdark-services/pegasus/pkg/hertzloggerzap"
 	hertzprometheus "github.com/ahdark-services/pegasus/pkg/hertzprometheus"
 	"github.com/cloudwego/hertz/pkg/app/server"
-	hertzregistry "github.com/cloudwego/hertz/pkg/app/server/registry"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/hertz/pkg/network/netpoll"
 	hertztracing "github.com/hertz-contrib/obs-opentelemetry/tracing"
@@ -25,8 +24,6 @@ func NewServer(
 	vip *viper.Viper,
 	lc fx.Lifecycle,
 	promRegistry *promclient.Registry,
-	serviceRegistry hertzregistry.Registry,
-	serviceInfo *hertzregistry.Info,
 ) (*server.Hertz, error) {
 	ctx, span := tracer.Start(ctx, "server.NewServer")
 	defer span.End()
@@ -36,7 +33,6 @@ func NewServer(
 	traceOption, cfg := hertztracing.NewServerTracer()
 	svr := server.Default(
 		traceOption,
-		server.WithRegistry(serviceRegistry, serviceInfo),
 		server.WithNetwork(vip.GetString("server.network")),
 		server.WithHostPorts(fmt.Sprintf("%s:%d", vip.GetString("server.address"), vip.GetInt("server.port"))),
 		server.WithHandleMethodNotAllowed(true),
