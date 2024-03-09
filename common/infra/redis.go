@@ -27,7 +27,7 @@ func NewRedisClient(ctx context.Context, vip *viper.Viper) (redis.UniversalClien
 			Addr:     fmt.Sprintf("%s:%d", vip.GetString("redis.host"), vip.GetUint16("redis.port")),
 			Username: vip.GetString("redis.username"),
 			Password: vip.GetString("redis.password"),
-			DB:       0,
+			DB:       vip.GetInt("redis.db"),
 		})
 
 		universalClient = client
