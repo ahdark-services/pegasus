@@ -9,7 +9,7 @@ import (
 )
 
 func TelegramWebhookSecretValidation(vip *viper.Viper) app.HandlerFunc {
-	if vip.GetString("telegram.webhook.secret") == "" {
+	if vip.GetString("telegram_bot.webhook.secret_token") == "" {
 		return func(ctx context.Context, c *app.RequestContext) {
 			otelzap.L().Ctx(ctx).Debug("Telegram webhook secret is not set")
 
@@ -22,7 +22,7 @@ func TelegramWebhookSecretValidation(vip *viper.Viper) app.HandlerFunc {
 		defer span.End()
 
 		secret := c.Request.Header.Get("X-Telegram-Webhook-Secret")
-		if secret != vip.GetString("telegram.webhook.secret") {
+		if secret != vip.GetString("telegram_bot.webhook.secret_token") {
 			c.AbortWithStatus(403)
 			otelzap.L().Ctx(ctx).Warn("Telegram webhook secret is invalid")
 			return
