@@ -1,2 +1,2 @@
-mod resource;
+pub mod resource;
 pub mod tracing;
