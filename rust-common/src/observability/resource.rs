@@ -30,7 +30,7 @@ pub fn init_resource(settings: &Settings, service_name: &str) -> Resource {
         ),
         KeyValue::new(
             opentelemetry_semantic_conventions::resource::SERVICE_INSTANCE_ID,
-            settings.instance_id.clone(),
+            settings.instance_id.as_ref().unwrap().clone(),
         ),
         KeyValue::new(
             opentelemetry_semantic_conventions::resource::DEPLOYMENT_ENVIRONMENT,
@@ -41,19 +41,18 @@ pub fn init_resource(settings: &Settings, service_name: &str) -> Resource {
             },
         ),
     ])
-        .merge(detector_resources)
+    .merge(detector_resources)
 }
 
 mod tests {
-    use crate::settings::Settings;
-
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
     fn test_init_resource() {
         let settings = Settings {
             namespace: "namespace".to_string(),
-            instance_id: "instance_id".to_string(),
+            instance_id: Some("instance_id".to_string()),
             debug: true,
             ..Default::default()
         };

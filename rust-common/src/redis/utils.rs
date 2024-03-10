@@ -1,11 +1,25 @@
 use crate::settings::Settings;
 
+macro_rules! none_if_not_exist {
+    ($value:expr) => {
+        if $value.is_none() || $value.as_ref().unwrap().is_empty() {
+            None
+        } else {
+            $value
+        }
+    };
+}
+
 pub(crate) fn parse_redis_settings(settings: &Settings) -> String {
     let redis_settings = settings.redis.as_ref().unwrap();
-    let credentials = match (
-        redis_settings.username.as_ref(),
-        redis_settings.password.as_ref(),
-    ) {
+
+    log::debug!("Redis username: {:?}", redis_settings.username);
+    log::debug!("Redis password: {:?}", redis_settings.password);
+
+    let username = none_if_not_exist!(redis_settings.username.clone());
+    let password = none_if_not_exist!(redis_settings.password.clone());
+
+    let credentials = match (username.as_ref(), password.as_ref()) {
         (None, Some(password)) => format!("{}@", password), // password only
         (Some(username), Some(password)) => format!("{}:{}@", username, password), // username and password
         _ => "".to_string(),
@@ -24,8 +38,10 @@ pub(crate) fn parse_redis_settings(settings: &Settings) -> String {
 }
 
 mod tests {
+    #[allow(unused_imports)]
     use crate::settings::RedisMode;
 
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]

@@ -1,12 +1,21 @@
 use std::env;
 
-use opentelemetry::trace::{TraceContextExt, Tracer};
-use opentelemetry::{global, Context};
+use opentelemetry::global;
+use teloxide::Bot;
 
+use pegasus_common::bot::channel::MqUpdateListener;
+use pegasus_common::bot::state::new_state_storage;
+use pegasus_common::mq::connection::new_amqp_connection;
 use pegasus_common::{observability, settings};
 
+use crate::run::run;
+
+mod handlers;
+mod run;
+mod state;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
     let settings_path = match env::args().nth(1) {
@@ -16,23 +25,23 @@ async fn main() {
         }
         None => env::current_dir().unwrap().join("config.yaml"),
     };
-    let settings = settings::Settings::read_from_file(settings_path).unwrap();
+    let ref settings = settings::Settings::read_from_file(settings_path).unwrap();
 
     observability::tracing::init_tracer(
-        &settings,
+        settings,
         env::var("CARGO_PKG_NAME")
             .unwrap_or("unknown".parse().unwrap())
             .as_str(),
     );
 
-    print_hello();
+    let amqp_conn = new_amqp_connection(settings).await;
+
+    let bot = Bot::new(settings.telegram_bot.clone().unwrap().token);
+    let state_storage = new_state_storage(settings).await;
+    let listener = MqUpdateListener::new("stickers-export-handler", amqp_conn, settings).await?;
+
+    run(bot, listener, state_storage).await;
 
     global::shutdown_tracer_provider();
-}
-
-fn print_hello() {
-    let _guard =
-        Context::current_with_span(global::tracer("example-tracer").start("print_hello")).attach();
-
-    println!("Hello, world!");
+    Ok(())
 }
