@@ -10,4 +10,6 @@ pegasus-common = { path = "../../rust-common" }
 
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
 log = { workspace = true }
+pretty_env_logger = { workspace = true }
 opentelemetry = { workspace = true, features = ["trace"] }
+teloxide = { workspace = true, features = ["macros"] }

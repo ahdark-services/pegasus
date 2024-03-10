@@ -30,10 +30,7 @@ pub fn init_resource(settings: &Settings, service_name: &str) -> Resource {
         ),
         KeyValue::new(
             opentelemetry_semantic_conventions::resource::SERVICE_INSTANCE_ID,
-            settings
-                .instance_id
-                .clone()
-                .unwrap_or(uuid::Uuid::new_v4().to_string()),
+            settings.instance_id.clone(),
         ),
         KeyValue::new(
             opentelemetry_semantic_conventions::resource::DEPLOYMENT_ENVIRONMENT,
@@ -44,5 +41,45 @@ pub fn init_resource(settings: &Settings, service_name: &str) -> Resource {
             },
         ),
     ])
-    .merge(detector_resources)
+        .merge(detector_resources)
+}
+
+mod tests {
+    use crate::settings::Settings;
+
+    use super::*;
+
+    #[test]
+    fn test_init_resource() {
+        let settings = Settings {
+            namespace: "namespace".to_string(),
+            instance_id: "instance_id".to_string(),
+            debug: true,
+            ..Default::default()
+        };
+
+        let resource = init_resource(&settings, "service_name");
+
+        assert_eq!(
+            resource.get(opentelemetry_semantic_conventions::resource::SERVICE_NAME.into()),
+            Some("namespace-service_name".into())
+        );
+        assert_eq!(
+            resource.get(opentelemetry_semantic_conventions::resource::SERVICE_VERSION.into()),
+            Some(env!("CARGO_PKG_VERSION").into())
+        );
+        assert_eq!(
+            resource.get(opentelemetry_semantic_conventions::resource::SERVICE_NAMESPACE.into()),
+            Some("namespace".into())
+        );
+        assert_eq!(
+            resource.get(opentelemetry_semantic_conventions::resource::SERVICE_INSTANCE_ID.into()),
+            Some("instance_id".into())
+        );
+        assert_eq!(
+            resource
+                .get(opentelemetry_semantic_conventions::resource::DEPLOYMENT_ENVIRONMENT.into()),
+            Some("development".into())
+        );
+    }
 }

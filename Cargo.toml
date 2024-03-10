@@ -6,9 +6,11 @@ members = [
 ]
 
 [workspace.dependencies]
-teloxide = { version = "0.12", features = ["macros"] }
+teloxide = { version = "0.12", features = ["macros", "redis-storage"] }
 log = "0.4"
 pretty_env_logger = "0.5"
 tokio = "1"
 serde = "1"
 opentelemetry = "0.22"
+redis = { version = "0.25", features = ["tokio"] }
+lapin = { version = "2.3", features = ["rustls"] }

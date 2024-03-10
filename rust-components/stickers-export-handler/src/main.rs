@@ -7,6 +7,8 @@ use pegasus_common::{observability, settings};
 
 #[tokio::main]
 async fn main() {
+    pretty_env_logger::init();
+
     let settings_path = match env::args().nth(1) {
         Some(path) => {
             log::info!("Using settings file: {}", path);
