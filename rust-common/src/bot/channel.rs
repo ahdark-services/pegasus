@@ -9,7 +9,7 @@ use teloxide::update_listeners::{AsUpdateStream, UpdateListener};
 
 use crate::settings::Settings;
 
-struct MqUpdateListener {
+pub struct MqUpdateListener {
     channel: lapin::Channel,
     consumer: lapin::Consumer,
     consumer_tag: String,
@@ -20,7 +20,7 @@ struct MqUpdateListener {
 impl<'a> AsUpdateStream<'a> for MqUpdateListener {
     type StreamErr = lapin::Error;
     type Stream =
-    Box<dyn futures::Stream<Item=Result<Update, Self::StreamErr>> + Unpin + Send + 'a>;
+        Box<dyn futures::Stream<Item = Result<Update, Self::StreamErr>> + Unpin + Send + 'a>;
 
     fn as_stream(&'a mut self) -> Self::Stream {
         let flag = Arc::new(&self.flag);
@@ -45,7 +45,7 @@ impl<'a> AsUpdateStream<'a> for MqUpdateListener {
                     }
                 }
             }
-                .boxed()
+            .boxed()
         });
 
         Box::new(stream)
@@ -63,11 +63,11 @@ impl UpdateListener for MqUpdateListener {
 static EXCHANGE_NAME: &str = "bot_updates";
 
 impl MqUpdateListener {
-    async fn new(
+    pub async fn new(
         service_name: &str,
         amqp_conn: lapin::Connection,
         settings: &Settings,
-    ) -> Result<impl UpdateListener, lapin::Error> {
+    ) -> Result<Self, lapin::Error> {
         let channel = amqp_conn.create_channel().await.unwrap();
         log::debug!("Created amqp channel");
 
@@ -105,25 +105,28 @@ impl MqUpdateListener {
         let consumer = channel
             .basic_consume(
                 &queue_name,
-                settings.instance_id.as_str(),
+                settings.instance_id.as_ref().unwrap().as_str(),
                 lapin::options::BasicConsumeOptions::default(),
                 Default::default(),
             )
             .await?;
-        log::debug!("Created consumer: {}", settings.instance_id);
+        log::debug!(
+            "Created consumer: {}",
+            settings.instance_id.as_ref().unwrap()
+        );
 
         let (token, flag) = mk_stop_token();
 
         Ok(MqUpdateListener {
             channel,
             consumer,
-            consumer_tag: settings.instance_id.clone(),
+            consumer_tag: settings.instance_id.as_ref().unwrap().clone(),
             token,
             flag,
         })
     }
 
-    async fn stop(&mut self) -> Result<(), lapin::Error> {
+    pub async fn stop(&mut self) -> Result<(), lapin::Error> {
         self.channel
             .basic_cancel(&self.consumer_tag, BasicCancelOptions::default())
             .await?;

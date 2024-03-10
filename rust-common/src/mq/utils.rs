@@ -13,24 +13,16 @@ pub(crate) fn parse_amqp_settings(settings: &Settings) -> String {
         credentials,
         mq_settings.host.clone().unwrap_or("localhost".to_string()),
         mq_settings.port.unwrap_or(5672),
-        match mq_settings.vhost.as_ref() {
-            Some(vhost) => format!(
-                "/{}",
-                if vhost.starts_with("/") {
-                    &vhost[1..]
-                } else {
-                    vhost
-                }
-            ),
-            None => "/".into(),
-        }
+        mq_settings.vhost.clone().unwrap_or_default()
     )
 }
 
 mod tests {
-    use crate::settings::Mq;
-
+    #[allow(unused_imports)]
     use super::*;
+
+    #[allow(unused_imports)]
+    use crate::settings::Mq;
 
     #[test]
     fn test_parse_amqp_settings() {
@@ -81,6 +73,20 @@ mod tests {
             };
 
             assert_eq!(parse_amqp_settings(&settings), "amqp://localhost:5672/");
+        }
+        {
+            let settings = Settings {
+                mq: Some(Mq {
+                    host: Some("localhost".to_string()),
+                    port: Some(5672),
+                    username: None,
+                    password: None,
+                    vhost: Some("/test".to_string()),
+                }),
+                ..Default::default()
+            };
+
+            assert_eq!(parse_amqp_settings(&settings), "amqp://localhost:5672/test");
         }
     }
 }

@@ -2314,6 +2314,7 @@ dependencies = [
  "opentelemetry",
  "pegasus-common",
  "pretty_env_logger",
+ "serde",
  "teloxide",
  "tokio",
 ]
