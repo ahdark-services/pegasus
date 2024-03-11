@@ -13,9 +13,6 @@ macro_rules! none_if_not_exist {
 pub(crate) fn parse_redis_settings(settings: &Settings) -> String {
     let redis_settings = settings.redis.as_ref().unwrap();
 
-    log::debug!("Redis username: {:?}", redis_settings.username);
-    log::debug!("Redis password: {:?}", redis_settings.password);
-
     let username = none_if_not_exist!(redis_settings.username.clone());
     let password = none_if_not_exist!(redis_settings.password.clone());
 

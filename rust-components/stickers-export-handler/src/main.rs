@@ -1,10 +1,11 @@
+#![feature(btree_cursors)]
+
 use std::env;
 
 use opentelemetry::global;
 use teloxide::Bot;
 
 use pegasus_common::bot::channel::MqUpdateListener;
-use pegasus_common::bot::state::new_state_storage;
 use pegasus_common::mq::connection::new_amqp_connection;
 use pegasus_common::{observability, settings};
 
@@ -12,7 +13,6 @@ use crate::run::run;
 
 mod handlers;
 mod run;
-mod state;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -37,11 +37,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let amqp_conn = new_amqp_connection(settings).await;
 
     let bot = Bot::new(settings.telegram_bot.clone().unwrap().token);
-    let state_storage = new_state_storage(settings).await;
     let listener = MqUpdateListener::new("stickers-export-handler", amqp_conn, settings).await?;
 
-    run(bot, listener, state_storage).await;
+    run(bot, listener).await;
 
+    log::info!("Shutting down tracer provider");
     global::shutdown_tracer_provider();
+
     Ok(())
 }

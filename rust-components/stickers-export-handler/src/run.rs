@@ -1,28 +1,17 @@
-use std::sync::Arc;
-
-use teloxide::dispatching::dialogue::{serializer, RedisStorage};
 use teloxide::prelude::*;
 
 use pegasus_common::bot::channel::MqUpdateListener;
 
-use crate::handlers::start;
-use crate::state::State;
+use crate::handlers::{export_sticker_handler, Command};
 
-pub(crate) async fn run(
-    bot: Bot,
-    listener: MqUpdateListener,
-    state_storage: Arc<RedisStorage<serializer::Json>>,
-) {
+pub(crate) async fn run(bot: Bot, listener: MqUpdateListener) {
     let handler = dptree::entry().branch(
         Update::filter_message()
-            .filter(|message: Message| message.chat.is_private())
-            .enter_dialogue::<Message, RedisStorage<serializer::Json>, State>()
-            .branch(dptree::case![State::Start].endpoint(start)),
+            .filter_command::<Command>()
+            .branch(dptree::case![Command::ExportSticker].endpoint(export_sticker_handler)),
     );
 
     Dispatcher::builder(bot, handler)
-        .dependencies(dptree::deps![state_storage])
-        .enable_ctrlc_handler()
         .build()
         .dispatch_with_listener(
             listener,
