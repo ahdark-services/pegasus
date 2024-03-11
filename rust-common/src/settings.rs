@@ -9,7 +9,8 @@ use uuid::Uuid;
 pub struct Settings {
     pub namespace: String,
     pub version: String,
-    pub instance_id: Option<String>, // always exist
+    pub instance_id: Option<String>,
+    // always exist
     pub debug: bool,
     pub telegram_bot: Option<TelegramBot>,
     pub server: Option<Server>,
@@ -69,7 +70,7 @@ pub struct Database {
     #[serde(rename = "type")]
     pub database_type: DatabaseType,
     pub host: String,
-    pub port: i64,
+    pub port: u16,
     pub username: Option<String>,
     pub password: Option<String>,
     pub name: Option<String>,
@@ -81,7 +82,7 @@ pub struct Database {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Mq {
     pub host: Option<String>,
-    pub port: Option<i64>,
+    pub port: Option<u16>,
     pub username: Option<String>,
     pub password: Option<String>,
     pub vhost: Option<String>,
@@ -150,17 +151,17 @@ pub enum RedisMode {
 pub struct Redis {
     pub mode: Option<RedisMode>,
     pub host: Option<String>,
-    pub port: Option<i64>,
+    pub port: Option<u16>,
     pub username: Option<String>,
     pub password: Option<String>,
-    pub db: Option<i64>,
+    pub db: Option<u8>,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Server {
     pub network: Option<String>,
     pub address: Option<String>,
-    pub port: Option<i64>,
+    pub port: Option<u16>,
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
