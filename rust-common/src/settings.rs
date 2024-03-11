@@ -1,134 +1,15 @@
-use serde::{Deserialize, Serialize};
-use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
-pub fn new_settings(s: &str) -> Settings {
-    let settings: Settings = serde_yaml::from_str(s).unwrap_or_default();
-    settings
-}
-
-pub fn read_settings_from_file<P: AsRef<Path>>(
-    path: Option<P>,
-) -> Result<Settings, Box<dyn std::error::Error>> {
-    let file_path = match path {
-        Some(p) => p.as_ref().to_path_buf(),
-        None => env::current_dir()?.join("settings.yaml"),
-    };
-
-    let mut file = File::open(file_path)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-
-    let settings: Settings = new_settings(&contents);
-
-    Ok(settings)
-}
-
-#[test]
-fn test_new_settings() {
-    {
-        let test_file = r#"
-            namespace: "pegasus-bot"
-            version: "0.0.1"
-            #instance_id: ""
-            debug: false
-            
-            telegram_bot:
-              token: ""
-              webhook:
-                url: ""
-                max_connections: 100
-                ip_address: ""
-                allowed_updates:
-                  - "message"
-                  - "edited_message"
-                  - "channel_post"
-                  - "edited_channel_post"
-                  - "inline_query"
-                  - "chosen_inline_result"
-                  - "callback_query"
-                  - "shipping_query"
-                  - "pre_checkout_query"
-                  - "poll"
-                  - "poll_answer"
-                drop_pending_updates: false
-                secret_token: ""
-            
-            logging:
-              caller: true
-              trace_id: true
-              stacktrace: error
-              core:
-                - encoder: console
-                  target: stdout
-                  level: debug
-            
-            server:
-              network: "tcp"
-              address: "0.0.0.0"
-              port: 8080
-            
-            observability:
-              trace:
-                exporter:
-                  type: "otlp-grpc"
-                  endpoint: "localhost:4317"
-                  timeout: 10s
-                  insecure: true
-                batch_timeout: 5s
-                max_batch_entries: 512
-                export_timeout: 30s
-                max_queue_size: 2048
-                sampling_ratio: 0.1
-              metric:
-                reader:
-                  type: prometheus
-                  listen: "0.0.0.0:9201"
-            
-            database:
-              type: postgres
-              host: localhost
-              port: 5432
-              username: pegasus
-              password: pegasus
-              name: pegasus
-              charset: utf8mb4
-              sslmode: disable
-              table_prefix: ""
-            
-            redis:
-              mode: standalone
-              host: localhost
-              port: 6379
-              username: ""
-              password: "pegasus"
-              db: 0
-            
-            mq:
-              host: localhost
-              port: 5672
-              username: pegasus
-              password: pegasus
-              vhost: ""
-    "#;
-
-        let settings = new_settings(test_file);
-        assert_eq!(settings.namespace, "pegasus-bot");
-        assert_eq!(settings.version, "0.0.1");
-    }
-    {
-        let settings = new_settings("");
-        assert_eq!(settings.namespace, "");
-        assert_eq!(settings.version, "");
-    }
-}
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct Settings {
     pub namespace: String,
     pub version: String,
+    pub instance_id: Option<String>, // always exist
     pub debug: bool,
     pub telegram_bot: Option<TelegramBot>,
     pub server: Option<Server>,
@@ -136,6 +17,27 @@ pub struct Settings {
     pub database: Option<Database>,
     pub redis: Option<Redis>,
     pub mq: Option<Mq>,
+}
+
+impl Settings {
+    pub fn new(s: &str) -> Settings {
+        let mut settings: Settings = serde_yaml::from_str(s).unwrap_or_default();
+        if settings.instance_id.is_none() || settings.instance_id.as_ref().unwrap().is_empty() {
+            settings.instance_id = Some(Uuid::new_v4().to_string());
+        }
+
+        settings
+    }
+
+    pub fn read_from_file<P: AsRef<Path>>(path: P) -> Result<Settings, Box<dyn std::error::Error>> {
+        let mut file = File::open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+
+        let settings: Settings = Settings::new(&contents);
+
+        Ok(settings)
+    }
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
@@ -211,7 +113,7 @@ pub struct Reader {
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Trace {
-    pub exporter: Option<Exporter>,
+    pub exporter: Exporter,
     pub batch_timeout: Option<String>,
     pub max_batch_entries: Option<i64>,
     pub export_timeout: Option<String>,
@@ -237,8 +139,16 @@ pub struct Exporter {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RedisMode {
+    Standalone,
+    Sentinel,
+    Cluster,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct Redis {
-    pub mode: Option<String>,
+    pub mode: Option<RedisMode>,
     pub host: Option<String>,
     pub port: Option<i64>,
     pub username: Option<String>,
@@ -267,4 +177,103 @@ pub struct Webhook {
     pub allowed_updates: Option<Vec<String>>,
     pub drop_pending_updates: Option<bool>,
     pub secret_token: Option<String>,
+}
+
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[test]
+    fn test_new_settings() {
+        {
+            let test_file = r#"
+                namespace: "pegasus-bot"
+                version: "0.0.1"
+                #instance_id: ""
+                debug: false
+                
+                telegram_bot:
+                  token: ""
+                  webhook:
+                    url: ""
+                    max_connections: 100
+                    ip_address: ""
+                    allowed_updates:
+                      - "message"
+                      - "edited_message"
+                      - "channel_post"
+                      - "edited_channel_post"
+                      - "inline_query"
+                      - "chosen_inline_result"
+                      - "callback_query"
+                      - "shipping_query"
+                      - "pre_checkout_query"
+                      - "poll"
+                      - "poll_answer"
+                    drop_pending_updates: false
+                    secret_token: ""
+                
+                logging:
+                  caller: true
+                  trace_id: true
+                  stacktrace: error
+                  core:
+                    - encoder: console
+                      target: stdout
+                      level: debug
+                
+                server:
+                  network: "tcp"
+                  address: "0.0.0.0"
+                  port: 8080
+                
+                observability:
+                  trace:
+                    exporter:
+                      type: "otlp-grpc"
+                      endpoint: "localhost:4317"
+                      timeout: 10s
+                      insecure: true
+                    batch_timeout: 5s
+                    max_batch_entries: 512
+                    export_timeout: 30s
+                    max_queue_size: 2048
+                    sampling_ratio: 0.1
+                  metric:
+                    reader:
+                      type: prometheus
+                      listen: "0.0.0.0:9201"
+                
+                database:
+                  type: postgres
+                  host: localhost
+                  port: 5432
+                  username: pegasus
+                  password: pegasus
+                  name: pegasus
+                  charset: utf8mb4
+                  sslmode: disable
+                  table_prefix: ""
+                
+                redis:
+                  mode: standalone
+                  host: localhost
+                  port: 6379
+                  username: ""
+                  password: "pegasus"
+                  db: 0
+                
+                mq:
+                  host: localhost
+                  port: 5672
+                  username: pegasus
+                  password: pegasus
+                  vhost: ""
+    "#;
+
+            let settings = Settings::new(test_file);
+            assert_eq!(settings.namespace, "pegasus-bot");
+            assert_eq!(settings.version, "0.0.1");
+        }
+    }
 }

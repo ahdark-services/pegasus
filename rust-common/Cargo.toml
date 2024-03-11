@@ -8,5 +8,20 @@ name = "pegasus_common"
 path = "src/lib.rs"
 
 [dependencies]
+tokio = { workspace = true, features = ["full"] }
 serde = { workspace = true, features = ["derive"] }
 serde_yaml = "0.9"
+opentelemetry = { workspace = true, features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.22", features = ["tokio", "trace", "metrics", "rt-tokio"] }
+opentelemetry-stdout = { version = "0.3", features = ["trace", "metrics"] }
+opentelemetry-otlp = { version = "0.15", features = ["http", "http-proto", "grpc-tonic"] }
+opentelemetry-prometheus = "0.15"
+opentelemetry-semantic-conventions = "0.14"
+uuid = { version = "1.7.0", features = ["v4"] }
+teloxide = { workspace = true }
+redis = { workspace = true }
+lapin = { workspace = true }
+log = { workspace = true }
+futures = { version = "0.3", features = [] }
+serde_json = { version = "1.0.114", features = [] }
+async-stream = "0.3.5"
