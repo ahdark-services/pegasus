@@ -1,5 +1,3 @@
-#![feature(btree_cursors)]
-
 use std::env;
 
 use opentelemetry::global;
@@ -38,6 +36,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let bot = Bot::new(settings.telegram_bot.clone().unwrap().token);
     let listener = MqUpdateListener::new("stickers-export-handler", amqp_conn, settings).await?;
+
+    log::info!("Application started");
 
     run(bot, listener).await;
 
