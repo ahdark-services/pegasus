@@ -1,27 +1,78 @@
+use std::io::Cursor;
+
+use image::io::Reader as ImageReader;
+use image::ImageError;
+use image::ImageFormat::Png;
+use teloxide::net::Download;
 use teloxide::prelude::*;
+use teloxide::types::{InputFile, MediaKind, MessageKind};
+use teloxide::utils::command::BotCommands;
 
-use crate::state::{AppDialogue, State};
+#[derive(BotCommands, Clone)]
+#[command(rename_rule = "lowercase")]
+pub(crate) enum Command {
+    #[command(description = "Export sticker", rename = "export_sticker")]
+    ExportSticker,
+}
 
-type HandlerResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+macro_rules! send_error_message {
+    ($bot:expr, $message:expr, $error_msg:expr) => {
+        $bot.send_message($message.chat.id, $error_msg)
+            .reply_to_message_id($message.id)
+            .send()
+            .await?;
+    };
+}
 
-pub(crate) async fn start(bot: Bot, dialogue: AppDialogue, msg: Message) -> HandlerResult {
-    if let None = msg.text() {
-        log::debug!("Skipping non-text message");
-        return Ok(());
-    }
+fn convert_webp_to_png(input_path: &str, output_path: &str) -> Result<(), image::ImageError> {
+    let img = ImageReader::open(input_path)?.decode()?;
 
-    if let Some(text) = msg.text() {
-        if text != "/export_sticker" {
-            log::debug!("Skipping non-start message");
+    img.as_bytes().to_vec();
+    img.save(output_path)?;
+    Ok(())
+}
+
+pub(crate) async fn export_sticker_handler(bot: Bot, message: Message) -> anyhow::Result<()> {
+    let reply_to_message = if let Some(reply_to_message) = message.reply_to_message() {
+        if let MessageKind::Common(reply_to_message) = &reply_to_message.kind {
+            reply_to_message
+        } else {
+            send_error_message!(bot, message, "You should reply to a sticker");
             return Ok(());
         }
-    }
+    } else {
+        send_error_message!(bot, message, "You should reply to a sticker");
+        return Ok(());
+    };
 
-    bot.send_message(msg.chat.id, "Please send me a sticker")
+    let media_sticker = if let MediaKind::Sticker(media_sticker) = &reply_to_message.media_kind {
+        media_sticker
+    } else {
+        send_error_message!(bot, message, "You should reply to a sticker");
+        return Ok(());
+    };
+
+    // convert sticker to png
+
+    let file = bot.get_file(&media_sticker.sticker.file.id).send().await?;
+    let mut buffer = Vec::new();
+    bot.download_file(&file.path, &mut buffer).await?;
+
+    let img = image::load_from_memory(&buffer)?;
+    let output_data = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ImageError> {
+        let mut bytes: Vec<u8> = Vec::new();
+        let mut cursor = Cursor::new(&mut bytes);
+        img.write_to(&mut cursor, Png)?;
+        Ok(bytes)
+    })
+    .await??;
+
+    // send png
+
+    bot.send_photo(message.chat.id, InputFile::memory(output_data))
+        .reply_to_message_id(message.id)
         .send()
         .await?;
-
-    dialogue.update(State::ReceiveSticker).await?;
 
     Ok(())
 }

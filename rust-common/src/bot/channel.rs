@@ -76,7 +76,10 @@ impl MqUpdateListener {
             .exchange_declare(
                 EXCHANGE_NAME,
                 lapin::ExchangeKind::Fanout,
-                lapin::options::ExchangeDeclareOptions::default(),
+                lapin::options::ExchangeDeclareOptions {
+                    auto_delete: true,
+                    ..Default::default()
+                },
                 Default::default(),
             )
             .await?;
@@ -85,7 +88,10 @@ impl MqUpdateListener {
         channel
             .queue_declare(
                 &queue_name,
-                lapin::options::QueueDeclareOptions::default(),
+                lapin::options::QueueDeclareOptions {
+                    auto_delete: true,
+                    ..Default::default()
+                },
                 Default::default(),
             )
             .await?;
@@ -106,7 +112,10 @@ impl MqUpdateListener {
             .basic_consume(
                 &queue_name,
                 settings.instance_id.as_ref().unwrap().as_str(),
-                lapin::options::BasicConsumeOptions::default(),
+                lapin::options::BasicConsumeOptions {
+                    no_ack: true,
+                    ..Default::default()
+                },
                 Default::default(),
             )
             .await?;
