@@ -24,14 +24,6 @@ macro_rules! send_error_message {
     };
 }
 
-fn convert_webp_to_png(input_path: &str, output_path: &str) -> Result<(), image::ImageError> {
-    let img = ImageReader::open(input_path)?.decode()?;
-
-    img.as_bytes().to_vec();
-    img.save(output_path)?;
-    Ok(())
-}
-
 pub(crate) async fn export_sticker_handler(bot: Bot, message: Message) -> anyhow::Result<()> {
     let reply_to_message = if let Some(reply_to_message) = message.reply_to_message() {
         if let MessageKind::Common(reply_to_message) = &reply_to_message.kind {
