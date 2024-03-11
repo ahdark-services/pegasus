@@ -49,3 +49,19 @@ services:
       - pegasus-network
     env_file:
       - .env
+
+  stickers-export-handler:
+    image: pegasus-bot/stickers-export-handler
+    build:
+      context: .
+      dockerfile: docker/rust-basic/Dockerfile
+      args:
+        COMPONENT: "stickers-export-handler"
+    deploy:
+      replicas: 3
+    networks:
+      - pegasus-network
+    env_file:
+      - .env
+    environment:
+      RUST_LOG: "info"

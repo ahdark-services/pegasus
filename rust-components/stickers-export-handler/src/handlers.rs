@@ -1,6 +1,5 @@
 use std::io::Cursor;
 
-use image::io::Reader as ImageReader;
 use image::ImageError;
 use image::ImageFormat::Png;
 use teloxide::net::Download;
