@@ -15,9 +15,10 @@ WORKDIR /app
 
 ARG COMPONENT
 
-RUN apt update && \
-    apt install -y openssl libssl-dev ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt update
+RUN apt install -y openssl libssl-dev ca-certificates
+RUN if [ "${COMPONENT}" = "stickers-export-handler" ]; then apt install -y ffmpeg; fi
+RUN rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/src/pegasus/target/release/${COMPONENT} /app/entry
 
