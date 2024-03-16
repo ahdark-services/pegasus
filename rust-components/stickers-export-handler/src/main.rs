@@ -9,7 +9,6 @@ use pegasus_common::{observability, settings};
 
 use crate::run::run;
 
-mod convert;
 mod handlers;
 mod run;
 

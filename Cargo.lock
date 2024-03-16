@@ -3,17 +3,6 @@
 version = 3
 
 [[package]]
-name = "ac-ffmpeg"
-version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43d1d77cd9038693a0551d28ccb8bd5c542e54017673bf9af780f7a3ca6da37c"
-dependencies = [
- "cc",
- "lazy_static",
- "pkg-config",
-]
-
-[[package]]
 name = "addr2line"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2962,7 +2951,6 @@ dependencies = [
 name = "stickers-export-handler"
 version = "0.1.0"
 dependencies = [
- "ac-ffmpeg",
  "anyhow",
  "image",
  "log",

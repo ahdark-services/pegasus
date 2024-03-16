@@ -20,4 +20,3 @@ teloxide = { workspace = true, features = ["macros"] }
 serde = { workspace = true, features = ["derive"] }
 image = { version = "0.25", features = [] }
 anyhow = "1.0"
-ac-ffmpeg = "0.18"
