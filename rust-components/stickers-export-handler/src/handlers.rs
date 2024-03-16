@@ -1,11 +1,10 @@
-use std::io::Cursor;
-
-use image::ImageError;
-use image::ImageFormat::Png;
+use image::guess_format;
 use teloxide::net::Download;
 use teloxide::prelude::*;
 use teloxide::types::{InputFile, MediaKind, MessageKind};
 use teloxide::utils::command::BotCommands;
+
+use crate::convert::{convert_webm_to_gif, convert_webp_to_png};
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -36,6 +35,12 @@ pub(crate) async fn export_sticker_handler(bot: Bot, message: Message) -> anyhow
         return Ok(());
     };
 
+    let pending_message = bot
+        .send_message(message.chat.id, "Processing...")
+        .reply_to_message_id(message.id)
+        .send()
+        .await?;
+
     let media_sticker = if let MediaKind::Sticker(media_sticker) = &reply_to_message.media_kind {
         media_sticker
     } else {
@@ -44,24 +49,51 @@ pub(crate) async fn export_sticker_handler(bot: Bot, message: Message) -> anyhow
     };
 
     // convert sticker to png
-
     let file = bot.get_file(&media_sticker.sticker.file.id).send().await?;
     let mut buffer = Vec::new();
-    bot.download_file(&file.path, &mut buffer).await?;
+    log::debug!(
+        "Downloading sticker: {}({}), chat id: {}",
+        media_sticker.sticker.file.id,
+        file.path,
+        message.chat.id,
+    );
 
-    let img = image::load_from_memory(&buffer)?;
-    let output_data = tokio::task::spawn_blocking(move || -> Result<Vec<u8>, ImageError> {
-        let mut bytes: Vec<u8> = Vec::new();
-        let mut cursor = Cursor::new(&mut bytes);
-        img.write_to(&mut cursor, Png)?;
-        Ok(bytes)
-    })
-    .await??;
+    match bot.download_file(&file.path, &mut buffer).await {
+        Ok(_) => {}
+        Err(err) => {
+            send_error_message!(
+                bot,
+                message,
+                &format!("Failed to download sticker: {}", err)
+            );
+            return Err(err.into());
+        }
+    };
+
+    let input_file = match guess_format(&buffer) {
+        Ok(_) => match convert_webp_to_png(buffer) {
+            Ok(buf) => InputFile::memory(buf).file_name("sticker.png"),
+            Err(err) => {
+                send_error_message!(bot, message, &format!("Failed to convert sticker: {}", err));
+                return Err(err.into());
+            }
+        },
+        Err(_) => match convert_webm_to_gif(buffer).await {
+            Ok(buf) => InputFile::memory(buf).file_name("sticker.gif"),
+            Err(err) => {
+                send_error_message!(bot, message, &format!("Failed to convert sticker: {}", err));
+                return Err(err.into());
+            }
+        },
+    };
 
     // send png
-
-    bot.send_photo(message.chat.id, InputFile::memory(output_data))
+    bot.send_document(message.chat.id, input_file)
         .reply_to_message_id(message.id)
+        .send()
+        .await?;
+
+    bot.delete_message(pending_message.chat.id, pending_message.id)
         .send()
         .await?;
 
