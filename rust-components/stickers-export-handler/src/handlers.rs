@@ -35,6 +35,12 @@ pub(crate) async fn export_sticker_handler(bot: Bot, message: Message) -> anyhow
         return Ok(());
     };
 
+    let pending_message = bot
+        .send_message(message.chat.id, "Processing...")
+        .reply_to_message_id(message.id)
+        .send()
+        .await?;
+
     let media_sticker = if let MediaKind::Sticker(media_sticker) = &reply_to_message.media_kind {
         media_sticker
     } else {
@@ -84,6 +90,10 @@ pub(crate) async fn export_sticker_handler(bot: Bot, message: Message) -> anyhow
     // send png
     bot.send_document(message.chat.id, input_file)
         .reply_to_message_id(message.id)
+        .send()
+        .await?;
+
+    bot.delete_message(pending_message.chat.id, pending_message.id)
         .send()
         .await?;
 
