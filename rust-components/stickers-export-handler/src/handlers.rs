@@ -4,8 +4,6 @@ use teloxide::prelude::*;
 use teloxide::types::{InputFile, MediaKind, MessageKind};
 use teloxide::utils::command::BotCommands;
 
-use crate::convert::{convert_webm_to_gif, convert_webp_to_png};
-
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 pub(crate) enum Command {
@@ -46,9 +44,10 @@ pub(crate) async fn export_sticker_handler(bot: Bot, message: Message) -> anyhow
     let file = bot.get_file(&media_sticker.sticker.file.id).send().await?;
     let mut buffer = Vec::new();
     log::debug!(
-        "Downloading sticker: {}, chat id: {}",
+        "Downloading sticker: {}({}), chat id: {}",
+        media_sticker.sticker.file.id,
         file.path,
-        message.chat.id
+        message.chat.id,
     );
 
     match bot.download_file(&file.path, &mut buffer).await {
@@ -63,20 +62,8 @@ pub(crate) async fn export_sticker_handler(bot: Bot, message: Message) -> anyhow
         }
     };
 
-    let bytes = match if guess_format(&buffer).is_ok() {
-        convert_webp_to_png(&mut buffer)
-    } else {
-        convert_webm_to_gif(&mut buffer)
-    } {
-        Ok(buf) => buf,
-        Err(err) => {
-            send_error_message!(bot, message, &format!("Failed to convert sticker: {}", err));
-            return Err(err.into());
-        }
-    };
-
     // send png
-    bot.send_photo(message.chat.id, InputFile::memory(bytes))
+    bot.send_photo(message.chat.id, InputFile::memory(buffer))
         .reply_to_message_id(message.id)
         .send()
         .await?;
