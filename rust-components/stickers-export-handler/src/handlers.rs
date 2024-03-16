@@ -4,6 +4,8 @@ use teloxide::prelude::*;
 use teloxide::types::{InputFile, MediaKind, MessageKind};
 use teloxide::utils::command::BotCommands;
 
+use crate::convert::{convert_webm_to_gif, convert_webp_to_png};
+
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 pub(crate) enum Command {
@@ -62,8 +64,25 @@ pub(crate) async fn export_sticker_handler(bot: Bot, message: Message) -> anyhow
         }
     };
 
+    let input_file = match guess_format(&buffer) {
+        Ok(_) => match convert_webp_to_png(buffer) {
+            Ok(buf) => InputFile::memory(buf).file_name("sticker.png"),
+            Err(err) => {
+                send_error_message!(bot, message, &format!("Failed to convert sticker: {}", err));
+                return Err(err.into());
+            }
+        },
+        Err(_) => match convert_webm_to_gif(buffer).await {
+            Ok(buf) => InputFile::memory(buf).file_name("sticker.gif"),
+            Err(err) => {
+                send_error_message!(bot, message, &format!("Failed to convert sticker: {}", err));
+                return Err(err.into());
+            }
+        },
+    };
+
     // send png
-    bot.send_photo(message.chat.id, InputFile::memory(buffer))
+    bot.send_document(message.chat.id, input_file)
         .reply_to_message_id(message.id)
         .send()
         .await?;
