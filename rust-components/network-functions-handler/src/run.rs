@@ -1,3 +1,4 @@
+use moka::future::Cache;
 use teloxide::prelude::*;
 
 use pegasus_common::bot::channel::MqUpdateListener;
@@ -8,19 +9,13 @@ pub(crate) async fn run(bot: Bot, listener: MqUpdateListener) {
     let handler = dptree::entry().branch(
         Update::filter_message()
             .filter_command::<Command>()
-            .endpoint(|bot: Bot, cmd: Command, msg: Message| async move {
-                match cmd {
-                    Command::QRCode(text) => qrcode_handler(&bot, &msg, text.as_str())
-                        .await
-                        .map_err(|e| {
-                            log::error!("Error handling qrcode command: {}", e);
-                            e
-                        }),
-                }
-            }),
+            .branch(dptree::case![Command::QRCode(string)].endpoint(qrcode_handler)),
     );
 
+    let cache: Cache<String, Vec<u8>> = Cache::new(1000);
+
     Dispatcher::builder(bot, handler)
+        .dependencies(dptree::deps![cache])
         .build()
         .dispatch_with_listener(
             listener,
