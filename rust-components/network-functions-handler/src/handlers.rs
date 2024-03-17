@@ -20,6 +20,11 @@ macro_rules! send_error_message {
 }
 
 pub(crate) async fn qrcode_handler(bot: &Bot, message: &Message, text: &str) -> anyhow::Result<()> {
+    if text.is_empty() {
+        send_error_message!(bot, message, "Text is empty");
+        return Err(anyhow::anyhow!("Text is empty"));
+    }
+
     let qr_code = match fast_qr::QRBuilder::new(text).build() {
         Ok(d) => d,
         Err(err) => {
