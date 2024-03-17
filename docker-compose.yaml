@@ -50,13 +50,13 @@ services:
     env_file:
       - .env
 
-  stickers-export-handler:
-    image: pegasus-bot/stickers-export-handler
+  network-functions-handler:
+    image: pegasus-bot/network-functions-handler
     build:
       context: .
       dockerfile: docker/rust-basic/Dockerfile
       args:
-        COMPONENT: "stickers-export-handler"
+        COMPONENT: "network-functions-handler"
     deploy:
       replicas: 3
     networks:

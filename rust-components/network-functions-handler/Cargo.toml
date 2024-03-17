@@ -1,0 +1,22 @@
+[package]
+name = "network-functions-handler"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[[bin]]
+name = "network-functions-handler"
+path = "src/main.rs"
+
+[dependencies]
+pegasus-common = { path = "../../rust-common" }
+
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
+log = { workspace = true }
+pretty_env_logger = { workspace = true }
+opentelemetry = { workspace = true, features = ["trace"] }
+teloxide = { workspace = true, features = ["macros"] }
+serde = { workspace = true, features = ["derive"] }
+anyhow = "1.0"
+fast_qr = { version = "0.12", features = ["image"] }
