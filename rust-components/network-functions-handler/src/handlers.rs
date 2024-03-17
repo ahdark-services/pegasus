@@ -1,4 +1,5 @@
 use fast_qr::convert::Builder;
+use moka::future::Cache;
 use teloxide::prelude::*;
 use teloxide::types::InputFile;
 use teloxide::utils::command::BotCommands;
@@ -19,13 +20,33 @@ macro_rules! send_error_message {
     };
 }
 
-pub(crate) async fn qrcode_handler(bot: &Bot, message: &Message, text: &str) -> anyhow::Result<()> {
+pub(crate) async fn qrcode_handler(
+    bot: Bot,
+    message: Message,
+    text: String,
+    cache: Cache<String, Vec<u8>>,
+) -> anyhow::Result<()> {
     if text.is_empty() {
         send_error_message!(bot, message, "Text is empty");
         return Err(anyhow::anyhow!("Text is empty"));
     }
 
-    let qr_code = match fast_qr::QRBuilder::new(text).build() {
+    // Check if QRCode already exists in cache
+    if let Some(data) = cache.get(&format!("qrcode:{}", &text).to_string()).await {
+        log::debug!("QRCode cache hit");
+
+        bot.send_photo(
+            message.chat.id,
+            InputFile::memory(data.to_vec()).file_name("qrcode.png"),
+        )
+        .reply_to_message_id(message.id)
+        .send()
+        .await?;
+
+        return Ok(());
+    }
+
+    let qr_code = match fast_qr::QRBuilder::new(text.clone()).build() {
         Ok(d) => d,
         Err(err) => {
             send_error_message!(bot, message, format!("Failed to generate QRCode: {}", err));
@@ -41,11 +62,15 @@ pub(crate) async fn qrcode_handler(bot: &Bot, message: &Message, text: &str) -> 
 
     bot.send_photo(
         message.chat.id,
-        InputFile::memory(image).file_name("qrcode.png"),
+        InputFile::memory(image.clone()).file_name("qrcode.png"),
     )
     .reply_to_message_id(message.id)
     .send()
     .await?;
+
+    cache
+        .insert(format!("qrcode:{}", text).to_string(), image.to_vec())
+        .await;
 
     Ok(())
 }

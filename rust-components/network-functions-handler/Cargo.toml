@@ -20,3 +20,4 @@ teloxide = { workspace = true, features = ["macros"] }
 serde = { workspace = true, features = ["derive"] }
 anyhow = "1.0"
 fast_qr = { version = "0.12", features = ["image"] }
+moka = { version = "0.12", features = ["future"] }
