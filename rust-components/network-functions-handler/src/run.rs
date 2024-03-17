@@ -2,13 +2,22 @@ use teloxide::prelude::*;
 
 use pegasus_common::bot::channel::MqUpdateListener;
 
-use crate::handlers::{export_sticker_handler, Command};
+use crate::handlers::{qrcode_handler, Command};
 
 pub(crate) async fn run(bot: Bot, listener: MqUpdateListener) {
     let handler = dptree::entry().branch(
         Update::filter_message()
             .filter_command::<Command>()
-            .branch(dptree::case![Command::ExportSticker].endpoint(export_sticker_handler)),
+            .endpoint(|bot: Bot, cmd: Command, msg: Message| async move {
+                match cmd {
+                    Command::QRCode(text) => qrcode_handler(&bot, &msg, text.as_str())
+                        .await
+                        .map_err(|e| {
+                            log::error!("Error handling qrcode command: {}", e);
+                            e
+                        }),
+                }
+            }),
     );
 
     Dispatcher::builder(bot, handler)

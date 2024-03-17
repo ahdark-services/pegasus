@@ -3,18 +3,17 @@ use std::env;
 use opentelemetry::global;
 use teloxide::Bot;
 
+use pegasus_common::{observability, settings};
 use pegasus_common::bot::channel::MqUpdateListener;
 use pegasus_common::mq::connection::new_amqp_connection;
-use pegasus_common::{observability, settings};
 
 use crate::run::run;
 
-mod convert;
 mod handlers;
 mod run;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> anyhow::Result<()> {
     pretty_env_logger::init();
 
     let settings_path = match env::args().nth(1) {
@@ -36,7 +35,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let amqp_conn = new_amqp_connection(settings).await;
 
     let bot = Bot::new(settings.telegram_bot.clone().unwrap().token);
-    let listener = MqUpdateListener::new("stickers-export-handler", amqp_conn, settings).await?;
+    let listener = MqUpdateListener::new("network-functions-handler", amqp_conn, settings).await?;
 
     log::info!("Application started");
 
