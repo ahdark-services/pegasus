@@ -21,6 +21,7 @@ pub fn parse_go_duration(s: &str) -> Result<Duration, ParseIntError> {
     };
 }
 
+#[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
     use super::*;

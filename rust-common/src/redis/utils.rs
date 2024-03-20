@@ -34,6 +34,7 @@ pub(crate) fn parse_redis_settings(settings: &Settings) -> String {
     )
 }
 
+#[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
     use crate::settings::RedisMode;
