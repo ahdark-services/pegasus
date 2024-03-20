@@ -180,6 +180,7 @@ pub struct Webhook {
     pub secret_token: Option<String>,
 }
 
+#[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
     use super::*;

@@ -44,6 +44,7 @@ pub fn init_resource(settings: &Settings, service_name: &str) -> Resource {
     .merge(detector_resources)
 }
 
+#[cfg(test)]
 mod tests {
     #[allow(unused_imports)]
     use super::*;
