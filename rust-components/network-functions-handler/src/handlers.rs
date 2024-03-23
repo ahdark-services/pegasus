@@ -1,16 +1,21 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use fast_qr::convert::Builder;
 use moka::future::Cache;
 use teloxide::prelude::*;
 use teloxide::types::InputFile;
 use teloxide::utils::command::BotCommands;
+use tokio::process::Command;
+use tokio::time::timeout;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
-pub(crate) enum Command {
+pub(crate) enum BotCommand {
     #[command(description = "Generate QRCode", rename = "qrcode")]
     QRCode(String),
+    #[command(description = "Ping the target", rename = "ping")]
+    Ping(String),
 }
 
 macro_rules! send_error_message {
@@ -89,6 +94,49 @@ pub(crate) async fn qrcode_handler(
     cache
         .insert(format!("qrcode:{}", text).to_string(), image.to_vec())
         .await;
+
+    Ok(())
+}
+
+pub(crate) async fn ping_handler(
+    bot: Arc<Bot>,
+    message: Message,
+    target: String,
+) -> anyhow::Result<()> {
+    if target.is_empty() {
+        send_error_message!(bot, message, "Target is empty");
+        return Err(anyhow::anyhow!("Target is empty"));
+    }
+
+    // Execute ping command
+    let output = timeout(
+        Duration::from_secs(5),
+        Command::new("ping")
+            .arg("-c")
+            .arg("4")
+            .arg(&target)
+            .output(),
+    )
+    .await??;
+
+    if !output.status.success() {
+        let error_message = format!(
+            "Failed to ping {}: {}",
+            &target,
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        send_error_message!(bot, message, &error_message);
+        return Err(anyhow::anyhow!(error_message));
+    }
+
+    let ping_result = String::from_utf8_lossy(&output.stdout).to_string();
+
+    // Send ping result
+    bot.send_message(message.chat.id, ping_result)
+        .reply_to_message_id(message.id)
+        .send()
+        .await?;
 
     Ok(())
 }
