@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use fast_qr::convert::Builder;
 use moka::future::Cache;
 use teloxide::prelude::*;
@@ -20,8 +22,20 @@ macro_rules! send_error_message {
     };
 }
 
+macro_rules! match_error {
+    ($data:expr, $bot:expr, $message:expr, $error_msg:expr) => {
+        match $data {
+            Ok(data) => data,
+            Err(err) => {
+                send_error_message!($bot, $message, format!($error_msg, err));
+                return Err(anyhow::anyhow!($error_msg, err));
+            }
+        }
+    };
+}
+
 pub(crate) async fn qrcode_handler(
-    bot: Bot,
+    bot: Arc<Bot>,
     message: Message,
     text: String,
     cache: Cache<String, Vec<u8>>,
@@ -46,19 +60,23 @@ pub(crate) async fn qrcode_handler(
         return Ok(());
     }
 
-    let qr_code = match fast_qr::QRBuilder::new(text.clone()).build() {
-        Ok(d) => d,
-        Err(err) => {
-            send_error_message!(bot, message, format!("Failed to generate QRCode: {}", err));
-            return Err(anyhow::anyhow!("Failed to generate QRCode: {}", err));
-        }
-    };
+    let qr_code = match_error!(
+        fast_qr::QRBuilder::new(text.clone()).build(),
+        bot,
+        message,
+        "Failed to build QRCode: {}"
+    );
 
-    let image = fast_qr::convert::image::ImageBuilder::default()
-        .shape(fast_qr::convert::Shape::Square)
-        .background_color([255, 255, 255, 0])
-        .fit_width(512)
-        .to_bytes(&qr_code)?;
+    let image = match_error!(
+        fast_qr::convert::image::ImageBuilder::default()
+            .shape(fast_qr::convert::Shape::Square)
+            .background_color([255, 255, 255, 0])
+            .fit_width(512)
+            .to_bytes(&qr_code),
+        bot,
+        message,
+        "Failed to convert QRCode to image: {}"
+    );
 
     bot.send_photo(
         message.chat.id,
