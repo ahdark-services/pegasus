@@ -1,17 +1,16 @@
-use std::env;
-use std::sync::Arc;
-
 use opentelemetry::global;
-use teloxide::Bot;
-
 use pegasus_common::{observability, settings};
 use pegasus_common::bot::channel::MqUpdateListener;
 use pegasus_common::mq::connection::new_amqp_connection;
+use std::env;
+use std::sync::Arc;
+use teloxide::Bot;
 
 use crate::run::run;
 
 mod handlers;
 mod run;
+mod utils;
 
 const SERVICE_NAME: &str = "network-functions-handler";
 

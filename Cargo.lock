@@ -1637,6 +1637,7 @@ dependencies = [
  "anyhow",
  "fast_qr",
  "fastping-rs",
+ "lazy_static",
  "log",
  "moka",
  "opentelemetry",

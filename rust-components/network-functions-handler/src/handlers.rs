@@ -1,4 +1,3 @@
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -9,8 +8,8 @@ use moka::future::Cache;
 use teloxide::prelude::*;
 use teloxide::types::InputFile;
 use teloxide::utils::command::BotCommands;
-use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
-use trust_dns_resolver::TokioAsyncResolver;
+
+use crate::utils::parse_target;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -99,30 +98,6 @@ pub(crate) async fn qrcode_handler(
         .await;
 
     Ok(())
-}
-
-async fn parse_target(target: &str) -> anyhow::Result<IpAddr> {
-    if let Ok(ip_addr) = target.parse::<Ipv4Addr>() {
-        Ok(IpAddr::V4(ip_addr))
-    } else if let Ok(ip_addr) = target.parse::<Ipv6Addr>() {
-        Ok(IpAddr::V6(ip_addr))
-    } else {
-        let resolver =
-            TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
-        let ip_addresses = resolver.lookup_ip(target).await?;
-        while let Some(ip_address) = ip_addresses.iter().next() {
-            if ip_address.is_loopback() {
-                continue;
-            }
-
-            return match ip_address {
-                IpAddr::V4(ip_addr) => Ok(IpAddr::V4(ip_addr)),
-                IpAddr::V6(ip_addr) => Ok(IpAddr::V6(ip_addr)),
-            };
-        }
-
-        Err(anyhow::anyhow!("Failed to resolve IP address"))
-    }
 }
 
 pub(crate) async fn ping_handler(
