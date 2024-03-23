@@ -1,11 +1,17 @@
+use std::fmt::Debug;
+
 use moka::future::Cache;
 use teloxide::prelude::*;
+use teloxide::update_listeners::UpdateListener;
 
-use pegasus_common::bot::channel::MqUpdateListener;
+use crate::handlers::{Command, qrcode_handler};
 
-use crate::handlers::{qrcode_handler, Command};
-
-pub(crate) async fn run(bot: Bot, listener: MqUpdateListener) {
+pub(crate) async fn run<'a, B, UListener>(bot: B, listener: UListener)
+where
+    B: Requester + Clone + Send + Sync + 'static,
+    UListener: UpdateListener + 'a,
+    UListener::Err: Debug,
+{
     let handler = dptree::entry().branch(
         Update::filter_message()
             .filter_command::<Command>()

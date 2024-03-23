@@ -1,4 +1,5 @@
 use std::env;
+use std::sync::Arc;
 
 use opentelemetry::global;
 use teloxide::Bot;
@@ -11,6 +12,8 @@ use crate::run::run;
 
 mod handlers;
 mod run;
+
+const SERVICE_NAME: &str = "network-functions-handler";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -34,8 +37,8 @@ async fn main() -> anyhow::Result<()> {
 
     let amqp_conn = new_amqp_connection(settings).await;
 
-    let bot = Bot::new(settings.telegram_bot.clone().unwrap().token);
-    let listener = MqUpdateListener::new("network-functions-handler", amqp_conn, settings).await?;
+    let bot = Arc::new(Bot::new(settings.telegram_bot.clone().unwrap().token));
+    let listener = MqUpdateListener::new(SERVICE_NAME, amqp_conn, settings).await?;
 
     log::info!("Application started");
 
