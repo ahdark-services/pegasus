@@ -1,13 +1,16 @@
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::Duration;
 
 use fast_qr::convert::Builder;
+use fastping_rs::PingResult::{Idle, Receive};
+use fastping_rs::Pinger;
 use moka::future::Cache;
 use teloxide::prelude::*;
 use teloxide::types::InputFile;
 use teloxide::utils::command::BotCommands;
-use tokio::process::Command;
-use tokio::time::timeout;
+use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
+use trust_dns_resolver::TokioAsyncResolver;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
@@ -98,6 +101,30 @@ pub(crate) async fn qrcode_handler(
     Ok(())
 }
 
+async fn parse_target(target: &str) -> anyhow::Result<IpAddr> {
+    if let Ok(ip_addr) = target.parse::<Ipv4Addr>() {
+        Ok(IpAddr::V4(ip_addr))
+    } else if let Ok(ip_addr) = target.parse::<Ipv6Addr>() {
+        Ok(IpAddr::V6(ip_addr))
+    } else {
+        let resolver =
+            TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
+        let ip_addresses = resolver.lookup_ip(target).await?;
+        while let Some(ip_address) = ip_addresses.iter().next() {
+            if ip_address.is_loopback() {
+                continue;
+            }
+
+            return match ip_address {
+                IpAddr::V4(ip_addr) => Ok(IpAddr::V4(ip_addr)),
+                IpAddr::V6(ip_addr) => Ok(IpAddr::V6(ip_addr)),
+            };
+        }
+
+        Err(anyhow::anyhow!("Failed to resolve IP address"))
+    }
+}
+
 pub(crate) async fn ping_handler(
     bot: Arc<Bot>,
     message: Message,
@@ -108,35 +135,49 @@ pub(crate) async fn ping_handler(
         return Err(anyhow::anyhow!("Target is empty"));
     }
 
-    // Execute ping command
-    let output = timeout(
-        Duration::from_secs(5),
-        Command::new("ping")
-            .arg("-c")
-            .arg("4")
-            .arg(&target)
-            .output(),
-    )
-    .await??;
+    let target_ip = match_error!(
+        parse_target(&target).await,
+        bot,
+        message,
+        "Failed to parse target: {}"
+    );
 
-    if !output.status.success() {
-        let error_message = format!(
-            "Failed to ping {}: {}",
-            &target,
-            String::from_utf8_lossy(&output.stderr)
-        );
+    let (pinger, results) = match_error!(
+        Pinger::new(None, Some(56)),
+        bot,
+        message,
+        "Failed to create pinger: {}"
+    );
 
-        send_error_message!(bot, message, &error_message);
-        return Err(anyhow::anyhow!(error_message));
+    pinger.add_ipaddr(target_ip.to_string().as_str());
+    pinger.ping_once();
+
+    match results.recv_timeout(Duration::from_secs(10)) {
+        Ok(result) => match result {
+            Idle { addr } => {
+                let err = format!("Failed to ping target: {}", addr);
+                send_error_message!(bot, message, &err);
+                return Err(anyhow::anyhow!("Failed to ping target: {}", err));
+            }
+            Receive { addr, rtt } => {
+                bot.send_message(
+                    message.chat.id,
+                    format!(
+                        "Sended 56 bytes to {} in {:.2}ms",
+                        addr,
+                        rtt.as_millis() as f64 / 1000.0
+                    ),
+                )
+                .reply_to_message_id(message.id)
+                .send()
+                .await?;
+            }
+        },
+        Err(e) => {
+            send_error_message!(bot, message, format!("Failed to receive result: {}", e));
+            return Err(anyhow::anyhow!("Failed to receive result: {}", e));
+        }
     }
-
-    let ping_result = String::from_utf8_lossy(&output.stdout).to_string();
-
-    // Send ping result
-    bot.send_message(message.chat.id, ping_result)
-        .reply_to_message_id(message.id)
-        .send()
-        .await?;
 
     Ok(())
 }
