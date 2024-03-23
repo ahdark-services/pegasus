@@ -1,16 +1,24 @@
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
+use std::time::Duration;
 
 use fast_qr::convert::Builder;
+use fastping_rs::PingResult::{Idle, Receive};
+use fastping_rs::Pinger;
 use moka::future::Cache;
 use teloxide::prelude::*;
 use teloxide::types::InputFile;
 use teloxide::utils::command::BotCommands;
+use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
+use trust_dns_resolver::TokioAsyncResolver;
 
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
-pub(crate) enum Command {
+pub(crate) enum BotCommand {
     #[command(description = "Generate QRCode", rename = "qrcode")]
     QRCode(String),
+    #[command(description = "Ping the target", rename = "ping")]
+    Ping(String),
 }
 
 macro_rules! send_error_message {
@@ -89,6 +97,83 @@ pub(crate) async fn qrcode_handler(
     cache
         .insert(format!("qrcode:{}", text).to_string(), image.to_vec())
         .await;
+
+    Ok(())
+}
+
+async fn parse_target(target: &str) -> anyhow::Result<IpAddr> {
+    if let Ok(ip_addr) = target.parse::<Ipv4Addr>() {
+        Ok(IpAddr::V4(ip_addr))
+    } else if let Ok(ip_addr) = target.parse::<Ipv6Addr>() {
+        Ok(IpAddr::V6(ip_addr))
+    } else {
+        let resolver =
+            TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
+        let ip_addresses = resolver.lookup_ip(target).await?;
+        while let Some(ip_address) = ip_addresses.iter().next() {
+            if ip_address.is_loopback() {
+                continue;
+            }
+
+            return match ip_address {
+                IpAddr::V4(ip_addr) => Ok(IpAddr::V4(ip_addr)),
+                IpAddr::V6(ip_addr) => Ok(IpAddr::V6(ip_addr)),
+            };
+        }
+
+        Err(anyhow::anyhow!("Failed to resolve IP address"))
+    }
+}
+
+pub(crate) async fn ping_handler(
+    bot: Arc<Bot>,
+    message: Message,
+    target: String,
+) -> anyhow::Result<()> {
+    if target.is_empty() {
+        send_error_message!(bot, message, "Target is empty");
+        return Err(anyhow::anyhow!("Target is empty"));
+    }
+
+    let target_ip = match_error!(
+        parse_target(&target).await,
+        bot,
+        message,
+        "Failed to parse target: {}"
+    );
+
+    let (pinger, results) = match_error!(
+        Pinger::new(None, Some(56)),
+        bot,
+        message,
+        "Failed to create pinger: {}"
+    );
+
+    pinger.add_ipaddr(target_ip.to_string().as_str());
+    pinger.ping_once();
+
+    match results.recv_timeout(Duration::from_secs(10)) {
+        Ok(result) => match result {
+            Idle { addr } => {
+                let err = format!("Failed to ping target: {}", addr);
+                send_error_message!(bot, message, &err);
+                return Err(anyhow::anyhow!("Failed to ping target: {}", err));
+            }
+            Receive { addr, rtt } => {
+                bot.send_message(
+                    message.chat.id,
+                    format!("Sended 56 bytes to {} in {:.2}ms", addr, rtt.as_millis()),
+                )
+                .reply_to_message_id(message.id)
+                .send()
+                .await?;
+            }
+        },
+        Err(e) => {
+            send_error_message!(bot, message, format!("Failed to receive result: {}", e));
+            return Err(anyhow::anyhow!("Failed to receive result: {}", e));
+        }
+    }
 
     Ok(())
 }
