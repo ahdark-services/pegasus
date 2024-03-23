@@ -162,11 +162,7 @@ pub(crate) async fn ping_handler(
             Receive { addr, rtt } => {
                 bot.send_message(
                     message.chat.id,
-                    format!(
-                        "Sended 56 bytes to {} in {:.2}ms",
-                        addr,
-                        rtt.as_millis() as f64 / 1000.0
-                    ),
+                    format!("Sended 56 bytes to {} in {:.2}ms", addr, rtt.as_millis()),
                 )
                 .reply_to_message_id(message.id)
                 .send()
