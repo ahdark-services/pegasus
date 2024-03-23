@@ -106,7 +106,7 @@ pub(crate) async fn ping_handler(
     target: String,
 ) -> anyhow::Result<()> {
     if target.is_empty() {
-        send_error_message!(bot, message, "Target is empty");
+        send_error_message!(bot, message, "Usage: /ping <target>");
         return Err(anyhow::anyhow!("Target is empty"));
     }
 
