@@ -42,7 +42,7 @@ macro_rules! match_error {
 }
 
 pub(crate) async fn qrcode_handler(
-    bot: Arc<Bot>,
+    bot: Bot,
     message: Message,
     text: String,
     cache: Cache<String, Vec<u8>>,
@@ -101,7 +101,7 @@ pub(crate) async fn qrcode_handler(
 }
 
 pub(crate) async fn ping_handler(
-    bot: Arc<Bot>,
+    bot: Bot,
     message: Message,
     target: String,
 ) -> anyhow::Result<()> {
