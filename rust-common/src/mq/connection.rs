@@ -1,5 +1,5 @@
-use lapin::uri::{AMQPAuthority, AMQPUri, AMQPUserInfo};
 use lapin::Connection;
+use lapin::uri::{AMQPAuthority, AMQPUri, AMQPUserInfo};
 
 use crate::settings::Settings;
 

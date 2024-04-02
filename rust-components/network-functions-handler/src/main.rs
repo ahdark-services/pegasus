@@ -1,10 +1,11 @@
+use std::env;
+
 use opentelemetry::global;
+
 use pegasus_common::{observability, settings};
 use pegasus_common::bot::channel::MqUpdateListener;
+use pegasus_common::bot::new_bot;
 use pegasus_common::mq::connection::new_amqp_connection;
-use std::env;
-use std::sync::Arc;
-use teloxide::Bot;
 
 use crate::run::run;
 
@@ -36,7 +37,7 @@ async fn main() -> anyhow::Result<()> {
 
     let amqp_conn = new_amqp_connection(settings).await;
 
-    let bot = Arc::new(Bot::new(settings.telegram_bot.clone().unwrap().token));
+    let bot = new_bot(settings.telegram_bot.as_ref().unwrap());
     let listener = MqUpdateListener::new(SERVICE_NAME, amqp_conn, settings).await?;
 
     log::info!("Application started");

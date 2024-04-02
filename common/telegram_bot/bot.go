@@ -20,6 +20,7 @@ func NewBot(ctx context.Context, vip *viper.Viper) (*telego.Bot, error) {
 		vip.GetString("telegram_bot.token"),
 		telego.WithLogger(otelzap.L().Sugar().Named("telegram_bot")),
 		telego.WithHealthCheck(),
+		telego.WithAPIServer(vip.GetString("telegram_bot.api_url")),
 	)
 	if err != nil {
 		span.RecordError(err)

@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fast_qr::convert::Builder;
-use fastping_rs::PingResult::{Idle, Receive};
 use fastping_rs::Pinger;
+use fastping_rs::PingResult::{Idle, Receive};
 use moka::future::Cache;
 use teloxide::prelude::*;
 use teloxide::types::InputFile;
@@ -42,7 +42,7 @@ macro_rules! match_error {
 }
 
 pub(crate) async fn qrcode_handler(
-    bot: Arc<Bot>,
+    bot: Bot,
     message: Message,
     text: String,
     cache: Cache<String, Vec<u8>>,
@@ -101,7 +101,7 @@ pub(crate) async fn qrcode_handler(
 }
 
 pub(crate) async fn ping_handler(
-    bot: Arc<Bot>,
+    bot: Bot,
     message: Message,
     target: String,
 ) -> anyhow::Result<()> {
