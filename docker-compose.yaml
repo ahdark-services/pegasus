@@ -9,10 +9,7 @@ networks:
 
 services:
   bot-api-server:
-    image: pegasus-bot/bot-api-server
-    build:
-      context: .
-      dockerfile: docker/bot-api-server/Dockerfile
+    image: aiogram/telegram-bot-api
     environment:
       TELEGRAM_API_ID: ""
       TELEGRAM_API_HASH: ""
