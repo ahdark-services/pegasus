@@ -2,8 +2,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use fast_qr::convert::Builder;
-use fastping_rs::PingResult::{Idle, Receive};
 use fastping_rs::Pinger;
+use fastping_rs::PingResult::{Idle, Receive};
 use moka::future::Cache;
 use teloxide::prelude::*;
 use teloxide::types::InputFile;
