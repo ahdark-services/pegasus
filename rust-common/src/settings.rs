@@ -167,6 +167,7 @@ pub struct Server {
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct TelegramBot {
     pub token: String,
+    pub api_url: Option<String>,
     pub webhook: Option<Webhook>,
 }
 
