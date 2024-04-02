@@ -1,8 +1,6 @@
 use std::env;
-use std::sync::Arc;
 
 use opentelemetry::global;
-use teloxide::Bot;
 
 use pegasus_common::{observability, settings};
 use pegasus_common::bot::channel::MqUpdateListener;
