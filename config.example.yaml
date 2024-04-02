@@ -5,6 +5,7 @@ debug: false
 
 telegram_bot:
   token: ""
+  api_url: "https://api.telegram.org"
   webhook:
     url: ""
     max_connections: 100
