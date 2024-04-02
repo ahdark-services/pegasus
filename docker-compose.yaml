@@ -8,6 +8,19 @@ networks:
     external: true
 
 services:
+  bot-api-server:
+    image: pegasus-bot/bot-api-server
+    build:
+      context: .
+      dockerfile: docker/bot-api-server/Dockerfile
+    environment:
+      TELEGRAM_API_ID: ""
+      TELEGRAM_API_HASH: ""
+    ports:
+      - "8081:8081"
+    networks:
+      - pegasus-network
+
   gateway:
     image: pegasus-bot/gateway
     build:
