@@ -1,11 +1,11 @@
 use std::time::Duration;
 
 use fast_qr::convert::Builder;
-use fastping_rs::PingResult::{Idle, Receive};
 use fastping_rs::Pinger;
+use fastping_rs::PingResult::{Idle, Receive};
 use moka::future::Cache;
-use opentelemetry::trace::{Span, SpanKind, Tracer};
 use opentelemetry::{global, KeyValue};
+use opentelemetry::trace::{SpanKind, TraceContextExt, Tracer};
 use teloxide::prelude::*;
 use teloxide::types::InputFile;
 use teloxide::utils::command::BotCommands;
@@ -50,15 +50,17 @@ pub(crate) async fn qrcode_handler(
     cache: Cache<String, Vec<u8>>,
 ) -> anyhow::Result<()> {
     let tracer = global::tracer("pegasus/rust-components/network-functions-handler/handlers");
-    let mut span = tracer
+    let parent_cx = update.cx.unwrap_or_default();
+    let span = tracer
         .span_builder("qrcode_handler")
         .with_kind(SpanKind::Internal)
-        .start_with_context(&tracer, &update.cx.unwrap_or_default());
+        .start_with_context(&tracer, &parent_cx);
+    let cx = parent_cx.with_span(span);
 
     if text.is_empty() {
         let err = anyhow::anyhow!("Text is empty");
         send_error_message!(bot, message, "Text is empty");
-        span.record_error(err.as_ref());
+        cx.span().record_error(err.as_ref());
         return Err(err);
     }
 
@@ -74,7 +76,7 @@ pub(crate) async fn qrcode_handler(
         .send()
         .await?;
 
-        span.set_attribute(KeyValue::new("cache_hit", true));
+        cx.span().set_attribute(KeyValue::new("cache_hit", true));
 
         return Ok(());
     }
@@ -119,20 +121,22 @@ pub(crate) async fn ping_handler(
     target: String,
 ) -> anyhow::Result<()> {
     let tracer = global::tracer("pegasus/rust-components/network-functions-handler/handlers");
-    let mut span = tracer
+    let parent_tx = update.cx.unwrap_or_default();
+    let span = tracer
         .span_builder("ping_handler")
         .with_kind(SpanKind::Internal)
-        .start_with_context(&tracer, &update.cx.unwrap_or_default());
+        .start_with_context(&tracer, &parent_tx);
+    let cx = parent_tx.with_span(span);
 
     if target.is_empty() {
         let err = anyhow::anyhow!("Target is empty");
         send_error_message!(bot, message, "Usage: /ping <target>");
-        span.record_error(err.as_ref());
+        cx.span().record_error(err.as_ref());
         return Err(err);
     }
 
     let target_ip = match_error!(
-        parse_target(&target).await,
+        parse_target(cx.clone(), &target).await,
         bot,
         message,
         "Failed to parse target: {}"
@@ -153,7 +157,8 @@ pub(crate) async fn ping_handler(
             Idle { addr } => {
                 let err = format!("Failed to ping target: {}", addr);
                 send_error_message!(bot, message, &err);
-                span.record_error(anyhow::anyhow!("Failed to ping target: {}", addr).as_ref());
+                cx.span()
+                    .record_error(anyhow::anyhow!("Failed to ping target: {}", addr).as_ref());
                 return Err(anyhow::anyhow!("Failed to ping target: {}", err));
             }
             Receive { addr, rtt } => {
@@ -169,7 +174,8 @@ pub(crate) async fn ping_handler(
         Err(e) => {
             let err = format!("Failed to receive result: {}", e);
             send_error_message!(bot, message, err.clone());
-            span.record_error(anyhow::anyhow!(err.clone()).as_ref());
+            cx.span()
+                .record_error(anyhow::anyhow!(err.clone()).as_ref());
             return Err(anyhow::anyhow!(err));
         }
     }
