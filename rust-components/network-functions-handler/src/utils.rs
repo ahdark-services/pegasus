@@ -1,6 +1,8 @@
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use lazy_static::lazy_static;
+use opentelemetry::{Context, global, KeyValue};
+use opentelemetry::trace::{TraceContextExt, Tracer};
 use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use trust_dns_resolver::TokioAsyncResolver;
 
@@ -9,7 +11,17 @@ lazy_static! {
         TokioAsyncResolver::tokio(ResolverConfig::default(), ResolverOpts::default());
 }
 
-pub(crate) async fn parse_target(target: &str) -> anyhow::Result<IpAddr> {
+pub(crate) async fn parse_target(parent_cx: Context, target: &str) -> anyhow::Result<IpAddr> {
+    let tracer = global::tracer("pegasus/rust-components/network-functions-handler/utils");
+    let cx = parent_cx.with_span(
+        tracer
+            .span_builder("parse_target")
+            .start_with_context(&tracer, &parent_cx),
+    );
+
+    cx.span()
+        .set_attribute(KeyValue::new("target", target.to_string()));
+
     if let Ok(ip_addr) = target.parse::<Ipv4Addr>() {
         Ok(IpAddr::V4(ip_addr))
     } else if let Ok(ip_addr) = target.parse::<Ipv6Addr>() {
@@ -39,15 +51,17 @@ mod tests {
     #[tokio::test]
     async fn test_parse_target() {
         assert_eq!(
-            parse_target("127.0.0.1").await.unwrap(),
+            parse_target(Context::default(), "127.0.0.1").await.unwrap(),
             IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
         );
 
         assert_eq!(
-            parse_target("::1").await.unwrap(),
+            parse_target(Context::default(), "::1").await.unwrap(),
             IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1))
         );
 
-        assert!(parse_target("example.com").await.is_ok());
+        assert!(parse_target(Context::default(), "example.com")
+            .await
+            .is_ok());
     }
 }

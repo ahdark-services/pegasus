@@ -1,7 +1,9 @@
+use std::pin::Pin;
+
 use futures::{FutureExt, StreamExt};
 use lapin::options::BasicCancelOptions;
 use lapin::protocol::constants::REPLY_SUCCESS;
-use opentelemetry::trace::Span;
+use opentelemetry::trace::TraceContextExt;
 use teloxide::prelude::Update;
 use teloxide::stop::{mk_stop_token, StopFlag, StopToken};
 use teloxide::update_listeners::{AsUpdateStream, UpdateListener};
@@ -20,11 +22,11 @@ pub struct MqUpdateListener {
 impl<'a> AsUpdateStream<'a> for MqUpdateListener {
     type StreamErr = lapin::Error;
     type Stream =
-        Box<dyn futures::Stream<Item = Result<Update, Self::StreamErr>> + Unpin + Send + 'a>;
+        Pin<Box<dyn futures::Stream<Item = Result<Update, Self::StreamErr>> + Unpin + Send + 'a>>;
 
     fn as_stream(&'a mut self) -> Self::Stream {
         let flag = self.flag.clone();
-        let stream = self.consumer.clone().filter_map(move |delivery| {
+        Box::pin(self.consumer.clone().filter_map(move |delivery| {
             assert!(!flag.is_stopped(), "Update listener stopped");
             if self.consumer.state() != lapin::ConsumerState::Active
                 && self.consumer.state() != lapin::ConsumerState::ActiveWithDelegate
@@ -34,17 +36,21 @@ impl<'a> AsUpdateStream<'a> for MqUpdateListener {
 
             async move {
                 match delivery {
-                    Ok(delivery) => match serde_json::from_slice::<Update>(&delivery.data) {
-                        Ok(mut update) => {
-                            let cx = extract_span_from_delivery(&delivery);
-                            update.cx = Some(cx);
-                            Some(Ok(update))
+                    Ok(delivery) => {
+                        let cx = extract_span_from_delivery(&delivery);
+
+                        match serde_json::from_slice::<Update>(&delivery.data) {
+                            Ok(mut update) => {
+                                update.cx = Some(cx);
+                                Some(Ok(update))
+                            }
+                            Err(e) => {
+                                log::error!("Error deserializing message: {}", e);
+                                cx.span().record_error(&e);
+                                None
+                            }
                         }
-                        Err(e) => {
-                            log::error!("Error deserializing message: {}", e);
-                            None
-                        }
-                    },
+                    }
                     Err(e) => {
                         log::error!("Error receiving message: {}", e);
                         None
@@ -52,9 +58,7 @@ impl<'a> AsUpdateStream<'a> for MqUpdateListener {
                 }
             }
             .boxed()
-        });
-
-        Box::new(stream)
+        }))
     }
 }
 
