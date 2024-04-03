@@ -2,10 +2,10 @@ use std::env;
 
 use opentelemetry::global;
 
-use pegasus_common::{observability, settings};
 use pegasus_common::bot::channel::MqUpdateListener;
 use pegasus_common::bot::new_bot;
 use pegasus_common::mq::connection::new_amqp_connection;
+use pegasus_common::{observability, settings};
 
 use crate::run::run;
 
@@ -28,12 +28,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let ref settings = settings::Settings::read_from_file(settings_path).unwrap();
 
-    observability::tracing::init_tracer(
-        settings,
-        env::var("CARGO_PKG_NAME")
-            .unwrap_or("unknown".parse().unwrap())
-            .as_str(),
-    );
+    observability::tracing::init_tracer(settings, SERVICE_NAME);
 
     let amqp_conn = new_amqp_connection(settings).await;
 

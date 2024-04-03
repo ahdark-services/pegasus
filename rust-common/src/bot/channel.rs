@@ -1,12 +1,12 @@
-use std::sync::Arc;
-
 use futures::{FutureExt, StreamExt};
 use lapin::options::BasicCancelOptions;
 use lapin::protocol::constants::REPLY_SUCCESS;
+use opentelemetry::trace::Span;
 use teloxide::prelude::Update;
 use teloxide::stop::{mk_stop_token, StopFlag, StopToken};
 use teloxide::update_listeners::{AsUpdateStream, UpdateListener};
 
+use crate::bot::utils::extract_span_from_delivery;
 use crate::settings::Settings;
 
 pub struct MqUpdateListener {
@@ -23,17 +23,23 @@ impl<'a> AsUpdateStream<'a> for MqUpdateListener {
         Box<dyn futures::Stream<Item = Result<Update, Self::StreamErr>> + Unpin + Send + 'a>;
 
     fn as_stream(&'a mut self) -> Self::Stream {
-        let flag = Arc::new(&self.flag);
-
+        let flag = self.flag.clone();
         let stream = self.consumer.clone().filter_map(move |delivery| {
-            if flag.is_stopped() {
-                return async { None }.boxed();
+            assert!(!flag.is_stopped(), "Update listener stopped");
+            if self.consumer.state() != lapin::ConsumerState::Active
+                && self.consumer.state() != lapin::ConsumerState::ActiveWithDelegate
+            {
+                panic!("Consumer state is not Active.");
             }
 
             async move {
                 match delivery {
                     Ok(delivery) => match serde_json::from_slice::<Update>(&delivery.data) {
-                        Ok(update) => Some(Ok(update)),
+                        Ok(mut update) => {
+                            let cx = extract_span_from_delivery(&delivery);
+                            update.cx = Some(cx);
+                            Some(Ok(update))
+                        }
                         Err(e) => {
                             log::error!("Error deserializing message: {}", e);
                             None

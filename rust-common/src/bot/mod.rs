@@ -4,6 +4,7 @@ use crate::settings::TelegramBot;
 
 pub mod channel;
 pub mod state;
+mod utils;
 
 pub fn new_bot(settings: &TelegramBot) -> Bot {
     let api_url = settings
