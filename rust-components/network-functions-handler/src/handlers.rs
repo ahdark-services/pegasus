@@ -141,6 +141,22 @@ pub(crate) async fn ping_handler(
         message,
         "Failed to parse target: {}"
     );
+    
+    // do not ping loopback address
+    if target_ip.is_loopback() {
+        let err = anyhow::anyhow!("Target is loopback address");
+        send_error_message!(bot, message, "Target is loopback address");
+        cx.span().record_error(err.as_ref());
+        return Err(err);
+    }
+    
+    // do not ping unspecified address
+    if target_ip.is_unspecified() {
+        let err = anyhow::anyhow!("Target is unspecified address");
+        send_error_message!(bot, message, "Target is unspecified address");
+        cx.span().record_error(err.as_ref());
+        return Err(err);
+    }
 
     let (pinger, results) = match_error!(
         Pinger::new(None, Some(56)),
@@ -152,7 +168,7 @@ pub(crate) async fn ping_handler(
     pinger.add_ipaddr(target_ip.to_string().as_str());
     pinger.ping_once();
 
-    match results.recv_timeout(Duration::from_secs(10)) {
+    match results.recv_timeout(Duration::from_secs(5)) {
         Ok(result) => match result {
             Idle { addr } => {
                 let err = format!("Failed to ping target: {}", addr);
