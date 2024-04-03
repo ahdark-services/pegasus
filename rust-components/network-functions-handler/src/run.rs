@@ -23,6 +23,7 @@ where
 
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![cache])
+        .distribution_function(|_| None::<std::convert::Infallible>)
         .build()
         .dispatch_with_listener(
             listener,
