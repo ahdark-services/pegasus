@@ -26,7 +26,9 @@ impl<'a> AsUpdateStream<'a> for MqUpdateListener {
 
     fn as_stream(&'a mut self) -> Self::Stream {
         let flag = self.flag.clone();
-        Box::pin(self.consumer.clone().filter_map(move |delivery| {
+        let consumer = self.consumer.clone();
+        
+        Box::pin(consumer.filter_map(move |delivery| {
             assert!(!flag.is_stopped(), "Update listener stopped");
             if self.consumer.state() != lapin::ConsumerState::Active
                 && self.consumer.state() != lapin::ConsumerState::ActiveWithDelegate
@@ -56,8 +58,7 @@ impl<'a> AsUpdateStream<'a> for MqUpdateListener {
                         None
                     }
                 }
-            }
-            .boxed()
+            }.boxed()
         }))
     }
 }

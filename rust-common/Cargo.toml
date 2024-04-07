@@ -22,7 +22,7 @@ teloxide = { workspace = true }
 redis = { workspace = true }
 lapin = { workspace = true }
 log = { workspace = true }
-futures = { version = "0.3", features = [] }
+futures = { version = "0.3", features = ["default"] }
 serde_json = { version = "1.0.114", features = [] }
 async-stream = "0.3.5"
 reqwest = "0.12"
