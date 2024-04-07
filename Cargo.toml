@@ -6,6 +6,8 @@ members = [
 ]
 
 [workspace.dependencies]
+pegasus-common = { path = "rust-common" }
+
 teloxide = { version = "0.12", features = ["macros", "redis-storage"], git = "https://github.com/AH-dark/teloxide.git", branch = "master" }
 log = "0.4"
 pretty_env_logger = "0.5"

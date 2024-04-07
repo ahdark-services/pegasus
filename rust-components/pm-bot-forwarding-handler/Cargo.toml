@@ -1,12 +1,12 @@
 [package]
-name = "network-functions-handler"
+name = "pm-bot-forwarding-handler"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
-name = "network-functions-handler"
+name = "pm-bot-forwarding-handler"
 path = "src/main.rs"
 
 [dependencies]
@@ -19,9 +19,4 @@ opentelemetry = { workspace = true, features = ["trace"] }
 teloxide = { workspace = true, features = ["macros"] }
 serde = { workspace = true, features = ["derive"] }
 anyhow = "1.0"
-fast_qr = { version = "0.12", features = ["image"] }
-moka = { version = "0.12", features = ["future"] }
-trust-dns-resolver = "0.23"
-fastping-rs = "0.2"
-lazy_static = "1"
 reqwest = "0.12"

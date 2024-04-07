@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -38,6 +39,18 @@ impl Settings {
         let settings: Settings = Settings::new(&contents);
 
         Ok(settings)
+    }
+
+    pub fn read_from_default_file() -> Result<Settings, Box<dyn std::error::Error>> {
+        let settings_path = match env::args().nth(1) {
+            Some(path) => {
+                log::info!("Using settings file: {}", path);
+                path.into()
+            }
+            None => env::current_dir().unwrap().join("config.yaml"),
+        };
+
+        Self::read_from_file(settings_path)
     }
 }
 
