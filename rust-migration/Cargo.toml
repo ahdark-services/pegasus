@@ -1,0 +1,24 @@
+[package]
+name = "pegasus-migration"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "pegasus-migration"
+path = "src/main.rs"
+
+[lib]
+name = "pegasus_migration"
+path = "src/lib.rs"
+
+[dependencies]
+async-std = { version = "1", features = ["attributes", "tokio1"] }
+pegasus-common = { workspace = true }
+
+[dependencies.sea-orm-migration]
+version = "0.12.0"
+features = [
+    "runtime-tokio-rustls",
+    "sqlx-postgres",
+]

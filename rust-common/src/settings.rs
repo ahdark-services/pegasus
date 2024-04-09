@@ -67,11 +67,12 @@ pub enum DatabaseType {
     Sqlite,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseSSLMode {
     Disable,
     Allow,
+    #[default]
     Prefer,
     Require,
     VerifyCA,
