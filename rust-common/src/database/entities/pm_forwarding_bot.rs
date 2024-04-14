@@ -12,6 +12,7 @@ pub struct Model {
 
     #[sea_orm(column_name = "bot_token", unique)]
     pub bot_token: String,
+    pub bot_webhook_secret: String,
     pub target_chat_id: i64,
 }
 

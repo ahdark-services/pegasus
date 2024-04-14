@@ -14,6 +14,7 @@ pub struct Model {
 
     pub telegram_chat_id: i64,
     pub telegram_message_id: i32,
+    pub forward_telegram_message_id: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

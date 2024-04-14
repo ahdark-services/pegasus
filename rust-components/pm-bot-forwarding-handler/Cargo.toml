@@ -22,3 +22,6 @@ sea-orm = { workspace = true }
 anyhow = "1.0"
 reqwest = "0.12"
 regex = "1"
+actix-web = "4"
+actix-web-opentelemetry = "0.17"
+rand = "0.8"

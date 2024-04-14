@@ -1,3 +1,5 @@
+use actix_web::{App, HttpServer};
+use actix_web_opentelemetry::RequestTracing;
 use opentelemetry::global;
 
 use pegasus_common::bot::channel::MqUpdateListener;
@@ -11,6 +13,7 @@ use crate::run::run;
 mod handlers;
 mod run;
 mod services;
+mod web;
 
 const SERVICE_NAME: &str = "pm-bot-forwarding-handler";
 
@@ -27,9 +30,29 @@ async fn main() -> anyhow::Result<()> {
     let listener = MqUpdateListener::new(SERVICE_NAME, amqp_conn, settings).await?;
     let redis_storage = new_state_storage(settings).await;
 
+    let forwarding_bot_service =
+        services::forwarding_bot::ForwardingBotService::new(db.clone(), settings.clone());
+    let forwarding_message_service =
+        services::forwarding_message::ForwardingMessageService::new(db.clone(), settings.clone());
+
     log::info!("Application started");
 
-    run(bot, listener, redis_storage, db).await;
+    let run_bot = run(bot, listener, redis_storage, db, settings.clone());
+    let run_web_server = HttpServer::new(move || {
+        App::new()
+            .wrap(RequestTracing::new())
+            .app_data(forwarding_bot_service.clone())
+            .app_data(forwarding_message_service.clone())
+            .service(actix_web::web::scope("/webhook").route(
+                "{token}",
+                actix_web::web::post().to(web::forwarding_bot_update_handler),
+            ))
+    })
+    .bind_auto_h2c(("0.0.0.0", 8080))
+    .unwrap()
+    .run();
+
+    tokio::join!(run_bot, run_web_server);
 
     log::info!("Shutting down tracer provider");
     global::shutdown_tracer_provider();
