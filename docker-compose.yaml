@@ -25,8 +25,6 @@ services:
       dockerfile: docker/basic/Dockerfile
       args:
         COMPONENT: "gateway"
-    ports:
-      - "8080:8080"
     networks:
       - pegasus-network
     env_file:
@@ -67,6 +65,24 @@ services:
       dockerfile: docker/rust-basic/Dockerfile
       args:
         COMPONENT: "network-functions-handler"
+        PROFILE: "dev"
+    deploy:
+      replicas: 3
+    networks:
+      - pegasus-network
+    env_file:
+      - .env
+    environment:
+      RUST_LOG: "info"
+
+  pm-bot-forwarding-handler:
+    image: pegasus-bot/pm-bot-forwarding-handler
+    build:
+      context: .
+      dockerfile: docker/rust-basic/Dockerfile
+      args:
+        COMPONENT: "pm-bot-forwarding-handler"
+        PROFILE: "dev"
     deploy:
       replicas: 3
     networks:

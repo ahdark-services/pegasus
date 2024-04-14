@@ -1,15 +1,17 @@
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use pegasus_common::settings::Settings;
 use sea_orm::DatabaseConnection;
 use teloxide::dispatching::dialogue::{serializer, RedisStorage};
 use teloxide::prelude::*;
 use teloxide::update_listeners::UpdateListener;
 
+use pegasus_common::settings::Settings;
+
 use crate::handlers::{
-    create_process_handler, receive_bot_token_handler, receive_cancel_handler,
-    receive_confirmation_handler, receive_message_target_handler, start_handler, BotState,
+    bot_reinitialize_handler, cancel_handler, choose_bot_handler, create_process_handler,
+    list_process_handler, receive_bot_token_handler, receive_confirmation_handler,
+    receive_message_target_handler, start_handler, BotState,
 };
 use crate::services::forwarding_bot::ForwardingBotService;
 
@@ -19,7 +21,8 @@ pub(crate) async fn run<'a, UListener>(
     redis_storage: Arc<RedisStorage<serializer::Json>>,
     db: DatabaseConnection,
     settings: Settings,
-) where
+) -> anyhow::Result<()>
+where
     UListener: UpdateListener + 'a,
     UListener::Err: Debug,
 {
@@ -29,10 +32,11 @@ pub(crate) async fn run<'a, UListener>(
                 .enter_dialogue::<Message, RedisStorage<serializer::Json>, BotState>()
                 .branch(dptree::case![BotState::Start].endpoint(start_handler))
                 .branch(
-                    dptree::case![BotState::ReceiveBotToken].endpoint(receive_bot_token_handler),
+                    dptree::case![BotState::CreationReceiveBotToken]
+                        .endpoint(receive_bot_token_handler),
                 )
                 .branch(
-                    dptree::case![BotState::ReceiveMessageTarget { bot_token }]
+                    dptree::case![BotState::CreationReceiveMessageTarget { bot_token }]
                         .endpoint(receive_message_target_handler),
                 ),
         )
@@ -40,25 +44,48 @@ pub(crate) async fn run<'a, UListener>(
             Update::filter_callback_query()
                 .enter_dialogue::<CallbackQuery, RedisStorage<serializer::Json>, BotState>()
                 .branch(
-                    dptree::case![BotState::MenuProcess]
+                    dptree::case![BotState::Started]
                         .filter(|c: CallbackQuery| {
                             c.data.unwrap_or_default() == "forward_bot_creation"
                         })
                         .endpoint(create_process_handler),
                 )
                 .branch(
-                    dptree::case![BotState::ReceiveConfirmation { bot_token, target }]
+                    dptree::case![BotState::Started]
+                        .filter(|c: CallbackQuery| c.data.unwrap_or_default() == "forward_bot_list")
+                        .endpoint(list_process_handler),
+                )
+                .branch(
+                    dptree::case![BotState::ChooseBot]
+                        .filter(|c: CallbackQuery| {
+                            c.data
+                                .unwrap_or_default()
+                                .starts_with("forward_bot_list_bot_")
+                        })
+                        .endpoint(choose_bot_handler),
+                )
+                .branch(
+                    dptree::case![BotState::ChooseBotAction]
+                        .filter(|c: CallbackQuery| {
+                            c.data
+                                .unwrap_or_default()
+                                .starts_with("forward_bot_reinitialize_")
+                        })
+                        .endpoint(bot_reinitialize_handler),
+                )
+                .branch(
+                    dptree::case![BotState::CreationReceiveConfirmation { bot_token, target }]
                         .filter(|c: CallbackQuery| {
                             c.data.unwrap_or_default() == "forward_bot_creation_confirm"
                         })
                         .endpoint(receive_confirmation_handler),
                 )
                 .branch(
-                    dptree::case![BotState::ReceiveConfirmation { bot_token, target }]
+                    dptree::entry()
                         .filter(|c: CallbackQuery| {
-                            c.data.unwrap_or_default() == "forward_bot_creation_cancel"
+                            c.data.unwrap_or_default() == "forward_bot_cancel"
                         })
-                        .endpoint(receive_cancel_handler),
+                        .endpoint(cancel_handler),
                 ),
         );
 
@@ -74,4 +101,6 @@ pub(crate) async fn run<'a, UListener>(
             LoggingErrorHandler::with_custom_text("An error from the update listener"),
         )
         .await;
+
+    Ok(())
 }

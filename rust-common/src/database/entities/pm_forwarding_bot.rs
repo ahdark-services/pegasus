@@ -14,6 +14,8 @@ pub struct Model {
     pub bot_token: String,
     pub bot_webhook_secret: String,
     pub target_chat_id: i64,
+    #[sea_orm(unsigned)]
+    pub telegram_user_refer: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

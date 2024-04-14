@@ -52,7 +52,9 @@ async fn main() -> anyhow::Result<()> {
     .unwrap()
     .run();
 
-    tokio::join!(run_bot, run_web_server);
+    let (r1, r2) = tokio::join!(run_bot, run_web_server);
+    r1?;
+    r2?;
 
     log::info!("Shutting down tracer provider");
     global::shutdown_tracer_provider();

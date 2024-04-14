@@ -38,7 +38,7 @@ services:
       - pegasus-network
 
   redis:
-    image: redis:latest
+    image: redis:7
     environment:
       - REDIS_PASSWORD=pegasus
     ports:

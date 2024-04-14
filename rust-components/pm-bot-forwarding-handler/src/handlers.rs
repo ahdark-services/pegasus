@@ -2,8 +2,9 @@ use std::borrow::Cow;
 
 use opentelemetry::global;
 use opentelemetry::trace::{Status, TraceContextExt, Tracer};
-use teloxide::dispatching::dialogue::{serializer, RedisStorage};
+use teloxide::dispatching::dialogue::{serializer, GetChatId, RedisStorage};
 use teloxide::prelude::*;
+use teloxide::types::InlineKeyboardMarkup;
 
 use crate::services::forwarding_bot::{ForwardingBotService, IForwardingBotService};
 
@@ -12,20 +13,27 @@ use crate::services::forwarding_bot::{ForwardingBotService, IForwardingBotServic
 pub(crate) enum BotState {
     #[default]
     Start,
-    MenuProcess,
-    ReceiveBotToken,
-    ReceiveMessageTarget {
+    Started,
+    CreationReceiveBotToken,
+    CreationReceiveMessageTarget {
         bot_token: String,
     },
-    ReceiveConfirmation {
+    CreationReceiveConfirmation {
         bot_token: String,
         target: i64,
     },
+    ChooseBot,
+    ChooseBotAction,
 }
 
 type BotDialog = Dialogue<BotState, RedisStorage<serializer::Json>>;
 
-pub async fn start_handler(bot: Bot, update: Update, message: Message) -> anyhow::Result<()> {
+pub async fn start_handler(
+    bot: Bot,
+    update: Update,
+    message: Message,
+    bot_dialog: BotDialog,
+) -> anyhow::Result<()> {
     let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/handlers");
     let parent_cx = update.cx.unwrap_or_default();
     let ref cx = parent_cx.with_span(
@@ -34,6 +42,8 @@ pub async fn start_handler(bot: Bot, update: Update, message: Message) -> anyhow
             .with_kind(opentelemetry::trace::SpanKind::Internal)
             .start_with_context(&tracer, &parent_cx),
     );
+
+    bot_dialog.reset().await.ok();
 
     // check command
     match message.text() {
@@ -58,20 +68,19 @@ You can manage your forwarding bots via these buttons.
 "#
         .trim(),
     )
-    .reply_markup(teloxide::types::ReplyMarkup::inline_kb(vec![
-        vec![
-            teloxide::types::InlineKeyboardButton::callback("Create", "forward_bot_creation"),
-            teloxide::types::InlineKeyboardButton::callback("List", "forward_bot_list"),
-        ],
-        vec![
-            teloxide::types::InlineKeyboardButton::callback("Delete", "forward_bot_delete"),
-            teloxide::types::InlineKeyboardButton::callback("Reinitialize", "forward_bot_reinit"),
-        ],
-    ]))
+    .reply_markup(teloxide::types::ReplyMarkup::inline_kb(vec![vec![
+        teloxide::types::InlineKeyboardButton::callback("Create", "forward_bot_creation"),
+        teloxide::types::InlineKeyboardButton::callback("List", "forward_bot_list"),
+    ]]))
     .await
     .map_err(|err| {
         cx.span().record_error(&err);
         anyhow::anyhow!("Failed to send message: {}", err)
+    })?;
+
+    bot_dialog.update(BotState::Started).await.map_err(|err| {
+        cx.span().record_error(&err);
+        anyhow::anyhow!("Failed to update dialogue state: {}", err)
     })?;
 
     Ok(())
@@ -100,6 +109,9 @@ pub async fn create_process_handler(
     })?;
 
     bot.send_message(message.chat.id, "Hello! Please, send me your bot token")
+        .reply_markup(teloxide::types::ReplyMarkup::inline_kb(vec![vec![
+            teloxide::types::InlineKeyboardButton::callback("Cancel", "forward_bot_cancel"),
+        ]]))
         .await
         .map_err(|err| {
             cx.span().record_error(&err);
@@ -107,7 +119,7 @@ pub async fn create_process_handler(
         })?;
 
     // update dialogue state
-    dialogue.update(BotState::ReceiveBotToken).await?;
+    dialogue.update(BotState::CreationReceiveBotToken).await?;
     Ok(())
 }
 
@@ -116,6 +128,7 @@ pub async fn receive_bot_token_handler(
     update: Update,
     message: Message,
     dialogue: BotDialog,
+    forwarding_bot_service: ForwardingBotService,
 ) -> anyhow::Result<()> {
     let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/handlers");
     let parent_cx = update.cx.unwrap_or_default();
@@ -149,6 +162,34 @@ pub async fn receive_bot_token_handler(
         return Ok(());
     }
 
+    // check if bot token already exists
+    {
+        let is_exist = forwarding_bot_service
+            .check_token_exist(&cx, bot_token.to_string())
+            .await
+            .map_err(|err| {
+                cx.span().record_error(err.as_ref());
+                anyhow::anyhow!("Failed to check token exist: {}", err)
+            })?;
+
+        if is_exist {
+            bot.send_message(
+                message.chat.id,
+                "Bot token already exists, please send another bot token",
+            )
+            .reply_markup(teloxide::types::ReplyMarkup::inline_kb(vec![vec![
+                teloxide::types::InlineKeyboardButton::callback("Cancel", "forward_bot_cancel"),
+            ]]))
+            .await
+            .map_err(|err| {
+                cx.span().record_error(&err);
+                anyhow::anyhow!("Failed to send message: {}", err)
+            })?;
+
+            return Err(anyhow::anyhow!("Bot token already exists"));
+        }
+    }
+
     bot.send_message(
         message.chat.id,
         format!(
@@ -156,14 +197,18 @@ pub async fn receive_bot_token_handler(
             bot_token
         ),
     )
+    .reply_markup(teloxide::types::ReplyMarkup::inline_kb(vec![vec![
+        teloxide::types::InlineKeyboardButton::callback("Cancel", "forward_bot_cancel"),
+    ]]))
     .await
     .map_err(|err| {
         cx.span().record_error(&err);
         anyhow::anyhow!("Failed to send message: {}", err)
     })?;
 
+    // update dialogue state
     dialogue
-        .update(BotState::ReceiveMessageTarget {
+        .update(BotState::CreationReceiveMessageTarget {
             bot_token: bot_token.to_string(),
         })
         .await
@@ -205,7 +250,7 @@ pub async fn receive_message_target_handler(
         })?;
 
     let bot_token = match state {
-        BotState::ReceiveMessageTarget { bot_token } => bot_token,
+        BotState::CreationReceiveMessageTarget { bot_token } => bot_token,
         _ => {
             cx.span().set_status(Status::Error {
                 description: Cow::from("Unexpected dialogue state"),
@@ -255,7 +300,7 @@ pub async fn receive_message_target_handler(
     .parse_mode(teloxide::types::ParseMode::Html)
     .reply_markup(teloxide::types::ReplyMarkup::inline_kb(vec![vec![
         teloxide::types::InlineKeyboardButton::callback("Confirm", "forward_bot_creation_confirm"),
-        teloxide::types::InlineKeyboardButton::callback("Cancel", "forward_bot_creation_cancel"),
+        teloxide::types::InlineKeyboardButton::callback("Cancel", "forward_bot_cancel"),
     ]]))
     .await
     .map_err(|err| {
@@ -264,7 +309,7 @@ pub async fn receive_message_target_handler(
     })?;
 
     dialogue
-        .update(BotState::ReceiveConfirmation { bot_token, target })
+        .update(BotState::CreationReceiveConfirmation { bot_token, target })
         .await
         .map_err(|err| {
             cx.span().record_error(&err);
@@ -274,14 +319,9 @@ pub async fn receive_message_target_handler(
     Ok(())
 }
 
-pub async fn receive_cancel_handler(
-    bot: Bot,
-    update: Update,
-    callback_query: CallbackQuery,
-    dialogue: BotDialog,
-) -> anyhow::Result<()> {
+pub async fn cancel_handler(bot: Bot, update: Update, dialogue: BotDialog) -> anyhow::Result<()> {
     let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/handlers");
-    let parent_cx = update.cx.unwrap_or_default();
+    let parent_cx = update.cx.clone().unwrap_or_default();
     let ref cx = parent_cx.with_span(
         tracer
             .span_builder("receive_cancel_handler")
@@ -289,14 +329,14 @@ pub async fn receive_cancel_handler(
             .start_with_context(&tracer, &parent_cx),
     );
 
-    let parent_msg = callback_query.message.ok_or_else(|| {
+    let chat_id = update.chat_id().ok_or_else(|| {
         cx.span().set_status(Status::Error {
-            description: Cow::from("No message in callback query"),
+            description: Cow::from("No chat id in update"),
         });
-        anyhow::anyhow!("No message in callback query")
+        anyhow::anyhow!("No chat id in update")
     })?;
 
-    bot.send_message(parent_msg.chat.id, "Bot creation cancelled.")
+    bot.send_message(chat_id, "Bot creation cancelled.")
         .await
         .map_err(|err| {
             cx.span().record_error(&err);
@@ -304,13 +344,6 @@ pub async fn receive_cancel_handler(
         })?;
 
     dialogue.reset().await?;
-
-    bot.delete_message(parent_msg.chat.id, parent_msg.id)
-        .await
-        .map_err(|err| {
-            cx.span().record_error(&err);
-            anyhow::anyhow!("Failed to delete message: {}", err)
-        })?;
 
     Ok(())
 }
@@ -331,6 +364,13 @@ pub async fn receive_confirmation_handler(
             .start_with_context(&tracer, &parent_cx),
     );
 
+    let parent_msg = callback_query.message.ok_or_else(|| {
+        cx.span().set_status(Status::Error {
+            description: Cow::from("No message in callback query"),
+        });
+        anyhow::anyhow!("No message in callback query")
+    })?;
+
     let state = dialogue
         .get()
         .await
@@ -346,30 +386,42 @@ pub async fn receive_confirmation_handler(
         })?;
 
     let (bot_token, target) = match state {
-        BotState::ReceiveConfirmation { bot_token, target } => (bot_token, target),
+        BotState::CreationReceiveConfirmation { bot_token, target } => (bot_token, target),
         _ => {
             cx.span().set_status(Status::Error {
                 description: Cow::from("Unexpected dialogue state"),
             });
+            bot.send_message(parent_msg.chat.id, "Unexpected dialogue state")
+                .await?;
             return Err(anyhow::anyhow!("Unexpected dialogue state"));
         }
     };
 
-    let parent_msg = callback_query.message.ok_or_else(|| {
-        cx.span().set_status(Status::Error {
-            description: Cow::from("No message in callback query"),
-        });
-        anyhow::anyhow!("No message in callback query")
-    })?;
-
     // create bot record
-    let model = forwarding_bot_service
-        .create_bot_record(&cx, bot_token.clone(), target)
-        .await?;
+    let model = match forwarding_bot_service
+        .create_bot_record(&cx, bot_token.clone(), target, callback_query.from.id.0)
+        .await
+    {
+        Ok(model) => model,
+        Err(err) => {
+            cx.span().record_error(err.as_ref());
+            bot.send_message(parent_msg.chat.id, format!("Failed to create bot: {}", err))
+                .await?;
+            return Err(err);
+        }
+    };
+
+    bot.answer_callback_query(callback_query.id)
+        .await
+        .map_err(|err| {
+            cx.span().record_error(&err);
+            anyhow::anyhow!("Failed to answer callback query: {}", err)
+        })?;
 
     // send success message
-    bot.send_message(
+    bot.edit_message_text(
         parent_msg.chat.id,
+        parent_msg.id,
         format!("Bot created successfully, id: {}", model.id),
     )
     .await
@@ -381,13 +433,238 @@ pub async fn receive_confirmation_handler(
     // reset dialogue state
     dialogue.reset().await?;
 
-    // delete message
-    bot.delete_message(parent_msg.chat.id, parent_msg.id)
+    Ok(())
+}
+
+pub async fn list_process_handler(
+    bot: Bot,
+    update: Update,
+    callback_query: CallbackQuery,
+    dialogue: BotDialog,
+    forwarding_bot_service: ForwardingBotService,
+) -> anyhow::Result<()> {
+    let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/handlers");
+    let parent_cx = update.cx.unwrap_or_default();
+    let ref cx = parent_cx.with_span(
+        tracer
+            .span_builder("list_process_handler")
+            .with_kind(opentelemetry::trace::SpanKind::Internal)
+            .start_with_context(&tracer, &parent_cx),
+    );
+
+    let message = callback_query.message.ok_or_else(|| {
+        cx.span().set_status(Status::Error {
+            description: Cow::from("No message in callback query"),
+        });
+        anyhow::anyhow!("No message in callback query")
+    })?;
+
+    let bot_records = forwarding_bot_service
+        .list_bots(&cx, callback_query.from.id.0)
+        .await
+        .map_err(|err| {
+            cx.span().record_error(err.as_ref());
+            anyhow::anyhow!("Failed to get all bot records: {}", err)
+        })?;
+
+    let mut inline_kb = bot_records
+        .chunks(2)
+        .map(|item| {
+            item.iter()
+                .map(|bot| {
+                    teloxide::types::InlineKeyboardButton::callback(
+                        format!("Bot {}", bot.id),
+                        format!("forward_bot_list_bot_{}", bot.id),
+                    )
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+
+    inline_kb.push(vec![teloxide::types::InlineKeyboardButton::callback(
+        "Cancel",
+        "forward_bot_cancel",
+    )]);
+
+    bot.answer_callback_query(callback_query.id)
         .await
         .map_err(|err| {
             cx.span().record_error(&err);
-            anyhow::anyhow!("Failed to delete message: {}", err)
+            anyhow::anyhow!("Failed to answer callback query: {}", err)
         })?;
+
+    bot.edit_message_text(message.chat.id, message.id, "Choose bot to do actions")
+        .reply_markup(InlineKeyboardMarkup::new(inline_kb))
+        .await
+        .map_err(|err| {
+            cx.span().record_error(&err);
+            anyhow::anyhow!("Failed to send message: {}", err)
+        })?;
+
+    // update dialogue state
+    dialogue.update(BotState::ChooseBot).await.map_err(|err| {
+        cx.span().record_error(&err);
+        anyhow::anyhow!("Failed to update dialogue state: {}", err)
+    })?;
+
+    Ok(())
+}
+
+pub async fn choose_bot_handler(
+    bot: Bot,
+    update: Update,
+    callback_query: CallbackQuery,
+    dialogue: BotDialog,
+) -> anyhow::Result<()> {
+    let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/handlers");
+    let parent_cx = update.cx.unwrap_or_default();
+    let ref cx = parent_cx.with_span(
+        tracer
+            .span_builder("choose_bot_handler")
+            .with_kind(opentelemetry::trace::SpanKind::Internal)
+            .start_with_context(&tracer, &parent_cx),
+    );
+
+    let message = callback_query.message.ok_or_else(|| {
+        cx.span().set_status(Status::Error {
+            description: Cow::from("No message in callback query"),
+        });
+        anyhow::anyhow!("No message in callback query")
+    })?;
+
+    let bot_id = callback_query
+        .data
+        .ok_or_else(|| {
+            cx.span().set_status(Status::Error {
+                description: Cow::from("No data in callback query"),
+            });
+            anyhow::anyhow!("No data in callback query")
+        })?
+        .strip_prefix("forward_bot_list_bot_")
+        .ok_or_else(|| {
+            cx.span().set_status(Status::Error {
+                description: Cow::from("Invalid bot id"),
+            });
+            anyhow::anyhow!("Invalid bot id")
+        })?
+        .parse::<i64>()
+        .map_err(|err| {
+            cx.span().record_error(&err);
+            anyhow::anyhow!("Failed to parse bot id: {}", err)
+        })?;
+
+    bot.answer_callback_query(callback_query.id)
+        .await
+        .map_err(|err| {
+            cx.span().record_error(&err);
+            anyhow::anyhow!("Failed to answer callback query: {}", err)
+        })?;
+
+    bot.edit_message_text(
+        message.chat.id,
+        message.id,
+        format!("Choose action for bot: {}", bot_id),
+    )
+    .reply_markup(InlineKeyboardMarkup::new(vec![vec![
+        teloxide::types::InlineKeyboardButton::callback(
+            "Reinitialize",
+            format!("forward_bot_reinitialize_{}", bot_id),
+        ),
+        teloxide::types::InlineKeyboardButton::callback(
+            "Delete",
+            format!("forward_bot_delete_{}", bot_id),
+        ),
+    ]]))
+    .await
+    .map_err(|err| {
+        cx.span().record_error(&err);
+        anyhow::anyhow!("Failed to send message: {}", err)
+    })?;
+
+    // update dialogue state
+    dialogue
+        .update(BotState::ChooseBotAction)
+        .await
+        .map_err(|err| {
+            cx.span().record_error(&err);
+            anyhow::anyhow!("Failed to update dialogue state: {}", err)
+        })?;
+
+    Ok(())
+}
+
+pub async fn bot_reinitialize_handler(
+    bot: Bot,
+    update: Update,
+    callback_query: CallbackQuery,
+    dialogue: BotDialog,
+    forwarding_bot_service: ForwardingBotService,
+) -> anyhow::Result<()> {
+    let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/handlers");
+    let parent_cx = update.cx.unwrap_or_default();
+    let ref cx = parent_cx.with_span(
+        tracer
+            .span_builder("bot_reinitialize_handler")
+            .with_kind(opentelemetry::trace::SpanKind::Internal)
+            .start_with_context(&tracer, &parent_cx),
+    );
+
+    let parent_msg = callback_query.message.ok_or_else(|| {
+        cx.span().set_status(Status::Error {
+            description: Cow::from("No message in callback query"),
+        });
+        anyhow::anyhow!("No message in callback query")
+    })?;
+
+    let bot_id = callback_query
+        .data
+        .ok_or_else(|| {
+            cx.span().set_status(Status::Error {
+                description: Cow::from("No data in callback query"),
+            });
+            anyhow::anyhow!("No data in callback query")
+        })?
+        .strip_prefix("forward_bot_reinitialize_")
+        .ok_or_else(|| {
+            cx.span().set_status(Status::Error {
+                description: Cow::from("Invalid bot id"),
+            });
+            anyhow::anyhow!("Invalid bot id")
+        })?
+        .parse::<i64>()
+        .map_err(|err| {
+            cx.span().record_error(&err);
+            anyhow::anyhow!("Failed to parse bot id: {}", err)
+        })?;
+
+    // reinitialize bot
+    forwarding_bot_service
+        .initialize_bot(&cx, bot_id)
+        .await
+        .map_err(|err| {
+            cx.span().record_error(err.as_ref());
+            anyhow::anyhow!("Failed to reinitialize bot: {}", err)
+        })?;
+
+    bot.answer_callback_query(callback_query.id)
+        .await
+        .map_err(|err| {
+            cx.span().record_error(&err);
+            anyhow::anyhow!("Failed to answer callback query: {}", err)
+        })?;
+
+    bot.edit_message_text(
+        parent_msg.chat.id,
+        parent_msg.id,
+        format!("Bot reinitialized successfully, id: {}", bot_id),
+    )
+    .await
+    .map_err(|err| {
+        cx.span().record_error(&err);
+        anyhow::anyhow!("Failed to send message: {}", err)
+    })?;
+
+    dialogue.reset().await?;
 
     Ok(())
 }
