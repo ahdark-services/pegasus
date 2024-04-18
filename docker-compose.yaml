@@ -10,13 +10,12 @@ networks:
 services:
   bot-api-server:
     image: aiogram/telegram-bot-api
-    environment:
-      TELEGRAM_API_ID: ""
-      TELEGRAM_API_HASH: ""
     ports:
       - "8081:8081"
     networks:
       - pegasus-network
+    env_file:
+      - .env
 
   gateway:
     image: pegasus-bot/gateway
