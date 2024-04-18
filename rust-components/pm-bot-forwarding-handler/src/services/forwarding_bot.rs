@@ -1,7 +1,3 @@
-use std::borrow::Cow;
-
-use opentelemetry::trace::{Status, TraceContextExt, Tracer};
-use opentelemetry::{global, Context};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use reqwest::Url;
@@ -12,7 +8,7 @@ use teloxide::prelude::*;
 use pegasus_common::database::entities;
 use pegasus_common::settings::Settings;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ForwardingBotService {
     db: DatabaseConnection,
     settings: Settings,
@@ -22,6 +18,21 @@ impl ForwardingBotService {
     pub fn new(db: DatabaseConnection, settings: Settings) -> Self {
         Self { db, settings }
     }
+
+    /// Create a new bot client with the given token
+    #[tracing::instrument(err)]
+    fn new_bot_client(&self, token: &str) -> anyhow::Result<Bot> {
+        let api_url = self
+            .settings
+            .telegram_bot
+            .clone()
+            .unwrap()
+            .api_url
+            .unwrap_or("https://api.telegram.org/".into());
+
+        let client = Bot::new(token).set_api_url(Url::parse(&api_url)?);
+        Ok(client)
+    }
 }
 
 pub trait IForwardingBotService {
@@ -30,7 +41,6 @@ pub trait IForwardingBotService {
     ///
     /// # Arguments
     ///
-    /// * `cx`: context
     /// * `bot_token`: bot token
     /// * `target_chat_id`: target chat id
     /// * `user_id`: telegram user id
@@ -39,7 +49,6 @@ pub trait IForwardingBotService {
     ///
     async fn create_bot_record(
         &self,
-        cx: &Context,
         bot_token: String,
         target_chat_id: i64,
         user_id: u64,
@@ -50,14 +59,12 @@ pub trait IForwardingBotService {
     ///
     /// # Arguments
     ///
-    /// * `cx`: context
     /// * `bot_token`: bot token
     ///
     /// returns: `Result<Model, Error>` bot record model
     ///
     async fn get_bot_record_by_token(
         &self,
-        cx: &Context,
         bot_token: String,
     ) -> anyhow::Result<entities::pm_forwarding_bot::Model>;
 
@@ -66,38 +73,34 @@ pub trait IForwardingBotService {
     ///
     /// # Arguments
     ///
-    /// * `cx`: context
     /// * `bot_token`: bot token
     ///
     /// returns: `Result<bool, Error>` true if token exists
     ///
-    async fn check_token_exist(&self, cx: &Context, bot_token: String) -> anyhow::Result<bool>;
+    async fn check_token_exist(&self, bot_token: String) -> anyhow::Result<bool>;
 
     ///
     /// Initialize bot, log out the bot and set the webhook to local api server
     ///
     /// # Arguments
     ///
-    /// * `cx`: context
     /// * `bot`: bot id
     ///
     /// returns: `Result<(), Error>`
     ///
-    async fn initialize_bot(&self, cx: &Context, bot: i64) -> anyhow::Result<()>;
+    async fn initialize_bot(&self, bot: i64) -> anyhow::Result<()>;
 
     ///
     /// List bots by telegram user id
     ///
     /// # Arguments
     ///
-    /// * `cx`: context
     /// * `telegram_user_id`: telegram user id
     ///
     /// returns: `Result<Vec<Model, Global>, Error>` list of bot records
     ///
     async fn list_bots(
         &self,
-        cx: &Context,
         telegram_user_id: u64,
     ) -> anyhow::Result<Vec<entities::pm_forwarding_bot::Model>>;
 }
@@ -112,21 +115,13 @@ fn random_webhook_secret() -> String {
 }
 
 impl IForwardingBotService for ForwardingBotService {
+    #[tracing::instrument(err)]
     async fn create_bot_record(
         &self,
-        cx: &Context,
         bot_token: String,
         target_chat_id: i64,
         user_id: u64,
     ) -> anyhow::Result<entities::pm_forwarding_bot::Model> {
-        let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/services");
-        let cx = cx.with_span(
-            tracer
-                .span_builder("ForwardingBotService.create_bot_record")
-                .with_kind(opentelemetry::trace::SpanKind::Internal)
-                .start_with_context(&tracer, cx),
-        );
-
         let bot = entities::pm_forwarding_bot::ActiveModel {
             bot_token: ActiveValue::Set(bot_token),
             bot_webhook_secret: ActiveValue::Set(random_webhook_secret()),
@@ -135,145 +130,65 @@ impl IForwardingBotService for ForwardingBotService {
             ..Default::default()
         }
         .insert(&self.db)
-        .await
-        .map_err(|err| {
-            cx.span().record_error(&err);
-            err
-        })?;
+        .await?;
 
         Ok(bot)
     }
 
+    #[tracing::instrument(err)]
     async fn get_bot_record_by_token(
         &self,
-        cx: &Context,
         bot_token: String,
     ) -> anyhow::Result<entities::pm_forwarding_bot::Model> {
-        let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/services");
-        let cx = cx.with_span(
-            tracer
-                .span_builder("ForwardingBotService.get_bot_record_by_token")
-                .with_kind(opentelemetry::trace::SpanKind::Internal)
-                .start_with_context(&tracer, cx),
-        );
-
         let bot = entities::pm_forwarding_bot::Entity::find()
             .filter(entities::pm_forwarding_bot::Column::BotToken.eq(bot_token))
             .one(&self.db)
-            .await
-            .map_err(|err| {
-                cx.span().record_error(&err);
-                err
-            })?
-            .ok_or_else(|| {
-                cx.span().set_status(Status::Error {
-                    description: Cow::from("Bot not found"),
-                });
-                anyhow::anyhow!("Bot not found")
-            })?;
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Bot not found"))?;
 
-        self.initialize_bot(&cx, bot.id).await?;
+        self.initialize_bot(bot.id).await?;
 
         Ok(bot)
     }
 
-    async fn check_token_exist(&self, cx: &Context, bot_token: String) -> anyhow::Result<bool> {
-        let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/services");
-        let cx = cx.with_span(
-            tracer
-                .span_builder("ForwardingBotService.check_token_exist")
-                .with_kind(opentelemetry::trace::SpanKind::Internal)
-                .start_with_context(&tracer, cx),
-        );
-
+    #[tracing::instrument(err)]
+    async fn check_token_exist(&self, bot_token: String) -> anyhow::Result<bool> {
         let bot = entities::pm_forwarding_bot::Entity::find()
             .filter(entities::pm_forwarding_bot::Column::BotToken.eq(bot_token))
             .one(&self.db)
-            .await
-            .map_err(|err| {
-                cx.span().record_error(&err);
-                err
-            })?;
+            .await?;
 
         Ok(bot.is_some())
     }
 
-    async fn initialize_bot(&self, cx: &Context, bot_id: i64) -> anyhow::Result<()> {
-        let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/services");
-        let cx = cx.with_span(
-            tracer
-                .span_builder("ForwardingBotService.initialize_bot")
-                .with_kind(opentelemetry::trace::SpanKind::Internal)
-                .start_with_context(&tracer, cx),
-        );
-
+    #[tracing::instrument(err)]
+    async fn initialize_bot(&self, bot_id: i64) -> anyhow::Result<()> {
         let bot = entities::pm_forwarding_bot::Entity::find_by_id(bot_id)
             .one(&self.db)
-            .await
-            .map_err(|err| {
-                cx.span().record_error(&err);
-                err
-            })?
-            .ok_or_else(|| anyhow::anyhow!("Bot record not found"))
-            .map_err(|err| {
-                cx.span().record_error(err.as_ref());
-                err
-            })?;
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Bot record not found"))?;
 
-        let api_url = self
-            .settings
-            .telegram_bot
-            .clone()
-            .unwrap()
-            .api_url
-            .unwrap_or("https://api.telegram.org/".into());
-
-        let client = Bot::new(&bot.bot_token).set_api_url(Url::parse(&api_url)?);
-        match client.log_out().await {
-            Ok(_) => log::debug!("Bot logged out, id: {}", bot.id),
-            Err(err) => {
-                cx.span().record_error(&err);
-                // ignore the error
-            }
-        }
-
-        let webhook_url = format!(
-            "http://pm-bot-forwarding-handler:8080/webhook/{}",
-            bot.bot_token
-        );
+        let client = self.new_bot_client(&bot.bot_token)?;
         client
-            .set_webhook(Url::parse(&webhook_url)?)
+            .set_webhook(Url::parse(&format!(
+                "http://pm-bot-forwarding-handler:8080/webhook/{}",
+                bot.bot_token
+            ))?)
             .secret_token(&bot.bot_webhook_secret)
-            .await
-            .map_err(|err| {
-                cx.span().record_error(&err);
-                err
-            })?;
+            .await?;
 
         Ok(())
     }
 
+    #[tracing::instrument(err)]
     async fn list_bots(
         &self,
-        cx: &Context,
         telegram_user_id: u64,
     ) -> anyhow::Result<Vec<entities::pm_forwarding_bot::Model>> {
-        let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/services");
-        let cx = cx.with_span(
-            tracer
-                .span_builder("ForwardingBotService.list_bots")
-                .with_kind(opentelemetry::trace::SpanKind::Internal)
-                .start_with_context(&tracer, cx),
-        );
-
         let bots = entities::pm_forwarding_bot::Entity::find()
             .filter(entities::pm_forwarding_bot::Column::TelegramUserRefer.eq(telegram_user_id))
             .all(&self.db)
-            .await
-            .map_err(|err| {
-                cx.span().record_error(&err);
-                err
-            })?;
+            .await?;
 
         Ok(bots)
     }

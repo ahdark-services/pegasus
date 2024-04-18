@@ -1,3 +1,5 @@
+use std::env;
+
 use actix_web::{App, HttpServer};
 use actix_web_opentelemetry::RequestTracing;
 use opentelemetry::global;
@@ -6,7 +8,7 @@ use pegasus_common::bot::channel::MqUpdateListener;
 use pegasus_common::bot::new_bot;
 use pegasus_common::bot::state::new_state_storage;
 use pegasus_common::mq::connection::new_amqp_connection;
-use pegasus_common::{database, observability, settings};
+use pegasus_common::{database, observability, redis, settings};
 
 use crate::run::run;
 
@@ -15,20 +17,29 @@ mod run;
 mod services;
 mod web;
 
-const SERVICE_NAME: &str = "pm-bot-forwarding-handler";
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    dotenv::dotenv().ok();
     pretty_env_logger::init();
-    let ref settings = settings::Settings::read_from_default_file().unwrap();
-    observability::tracing::init_tracer(settings, SERVICE_NAME);
+    let service_name = env!("CARGO_BIN_NAME");
+    let ref settings =
+        settings::Settings::read_from_default_file().expect("Failed to read settings");
+    observability::tracing::init_tracer(service_name, settings);
 
     let amqp_conn = new_amqp_connection(settings).await;
     let db = database::init_conn(settings.database.as_ref().unwrap()).await?;
+    let redis_client = redis::client::new_client(settings);
 
     let bot = new_bot(settings.telegram_bot.as_ref().unwrap());
-    let listener = MqUpdateListener::new(SERVICE_NAME, amqp_conn, settings).await?;
-    let redis_storage = new_state_storage(settings).await;
+    let listener = MqUpdateListener::new(service_name, amqp_conn, settings).await?;
+    let redis_storage = new_state_storage(
+        service_name,
+        redis_client
+            .get_multiplexed_tokio_connection()
+            .await
+            .unwrap(),
+    )
+    .await;
 
     let forwarding_bot_service =
         services::forwarding_bot::ForwardingBotService::new(db.clone(), settings.clone());
@@ -40,15 +51,15 @@ async fn main() -> anyhow::Result<()> {
     let run_bot = run(bot, listener, redis_storage, db, settings.clone());
     let run_web_server = HttpServer::new(move || {
         App::new()
-            .wrap(RequestTracing::new())
-            .app_data(forwarding_bot_service.clone())
-            .app_data(forwarding_message_service.clone())
-            .service(actix_web::web::scope("/webhook").route(
-                "{token}",
-                actix_web::web::post().to(web::forwarding_bot_update_handler),
+            .wrap(actix_web::middleware::Logger::default())
+            .wrap(RequestTracing::default())
+            .app_data(actix_web::web::Data::new(forwarding_bot_service.clone()))
+            .app_data(actix_web::web::Data::new(
+                forwarding_message_service.clone(),
             ))
+            .service(web::forwarding_bot_update_handler)
     })
-    .bind_auto_h2c(("0.0.0.0", 8080))
+    .bind(("0.0.0.0", 8080))
     .unwrap()
     .run();
 

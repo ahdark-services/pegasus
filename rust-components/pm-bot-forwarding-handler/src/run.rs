@@ -2,10 +2,10 @@ use std::fmt::Debug;
 use std::sync::Arc;
 
 use sea_orm::DatabaseConnection;
-use teloxide::dispatching::dialogue::{serializer, RedisStorage};
 use teloxide::prelude::*;
 use teloxide::update_listeners::UpdateListener;
 
+use pegasus_common::bot::state::RedisStorage;
 use pegasus_common::settings::Settings;
 
 use crate::handlers::{
@@ -18,7 +18,7 @@ use crate::services::forwarding_bot::ForwardingBotService;
 pub(crate) async fn run<'a, UListener>(
     bot: Bot,
     listener: UListener,
-    redis_storage: Arc<RedisStorage<serializer::Json>>,
+    redis_storage: Arc<RedisStorage>,
     db: DatabaseConnection,
     settings: Settings,
 ) -> anyhow::Result<()>
@@ -29,7 +29,12 @@ where
     let handler = dptree::entry()
         .branch(
             Update::filter_message()
-                .enter_dialogue::<Message, RedisStorage<serializer::Json>, BotState>()
+                .enter_dialogue::<Message, RedisStorage, BotState>()
+                .branch(
+                    dptree::entry()
+                        .filter(|m: Message| m.text().unwrap_or_default() == "/pm_forwarding_bot")
+                        .endpoint(start_handler),
+                )
                 .branch(dptree::case![BotState::Start].endpoint(start_handler))
                 .branch(
                     dptree::case![BotState::CreationReceiveBotToken]
@@ -42,16 +47,16 @@ where
         )
         .branch(
             Update::filter_callback_query()
-                .enter_dialogue::<CallbackQuery, RedisStorage<serializer::Json>, BotState>()
+                .enter_dialogue::<CallbackQuery, RedisStorage, BotState>()
                 .branch(
-                    dptree::case![BotState::Started]
+                    dptree::case![BotState::WaitingTopMenu]
                         .filter(|c: CallbackQuery| {
                             c.data.unwrap_or_default() == "forward_bot_creation"
                         })
                         .endpoint(create_process_handler),
                 )
                 .branch(
-                    dptree::case![BotState::Started]
+                    dptree::case![BotState::WaitingTopMenu]
                         .filter(|c: CallbackQuery| c.data.unwrap_or_default() == "forward_bot_list")
                         .endpoint(list_process_handler),
                 )
@@ -65,11 +70,9 @@ where
                         .endpoint(choose_bot_handler),
                 )
                 .branch(
-                    dptree::case![BotState::ChooseBotAction]
+                    dptree::case![BotState::ChooseBotAction(i64)]
                         .filter(|c: CallbackQuery| {
-                            c.data
-                                .unwrap_or_default()
-                                .starts_with("forward_bot_reinitialize_")
+                            c.data.unwrap_or_default() == "forward_bot_reinitialize"
                         })
                         .endpoint(bot_reinitialize_handler),
                 )

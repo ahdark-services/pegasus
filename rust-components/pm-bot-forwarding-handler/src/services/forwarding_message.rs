@@ -1,17 +1,17 @@
 use std::borrow::Cow;
 
-use opentelemetry::trace::{SpanKind, Status, TraceContextExt, Tracer};
-use opentelemetry::{global, Context};
+use opentelemetry::trace::{Status, TraceContextExt, Tracer};
+use opentelemetry::Context;
 use reqwest::Url;
 use sea_orm::prelude::*;
-use sea_orm::{ActiveValue, IntoActiveModel, TransactionTrait};
+use sea_orm::ActiveValue;
 use teloxide::prelude::*;
 use teloxide::types::{MessageId, UpdateKind};
 
 use pegasus_common::database::entities;
 use pegasus_common::settings::Settings;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ForwardingMessageService {
     db: DatabaseConnection,
     settings: Settings,
@@ -20,6 +20,20 @@ pub struct ForwardingMessageService {
 impl ForwardingMessageService {
     pub fn new(db: DatabaseConnection, settings: Settings) -> Self {
         Self { db, settings }
+    }
+
+    #[tracing::instrument(err)]
+    fn new_bot_client(&self, token: &str) -> anyhow::Result<Bot> {
+        let api_url = self
+            .settings
+            .telegram_bot
+            .clone()
+            .unwrap()
+            .api_url
+            .unwrap_or("https://api.telegram.org/".into());
+
+        let client = Bot::new(token).set_api_url(Url::parse(&api_url)?);
+        Ok(client)
     }
 }
 
@@ -34,116 +48,72 @@ pub trait IForwardingMessageService {
     ///
     /// returns: `Result<(), Error>`
     ///
-    async fn handle_update_income(
-        &self,
-        cx: &Context,
-        bot_id: i64,
-        update: Update,
-    ) -> anyhow::Result<()>;
+    async fn handle_update_income(&self, bot_id: i64, update: Update) -> anyhow::Result<()>;
 }
 
 impl IForwardingMessageService for ForwardingMessageService {
-    async fn handle_update_income(
-        &self,
-        cx: &Context,
-        bot_id: i64,
-        update: Update,
-    ) -> anyhow::Result<()> {
-        let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/services");
-        let cx = cx.with_span(
-            tracer
-                .span_builder("ForwardingMessageService.handle_update_income")
-                .with_kind(SpanKind::Internal)
-                .start_with_context(&tracer, cx),
-        );
-
+    #[tracing::instrument(err)]
+    async fn handle_update_income(&self, bot_id: i64, update: Update) -> anyhow::Result<()> {
         let bot = entities::pm_forwarding_bot::Entity::find()
             .filter(entities::pm_forwarding_bot::Column::Id.eq(bot_id))
             .one(&self.db)
-            .await
-            .map_err(|err| {
-                cx.span().record_error(&err);
-                err
-            })?
-            .ok_or_else(|| anyhow::anyhow!("Bot record not found"))
-            .map_err(|err| {
-                cx.span().record_error(err.as_ref());
-                err
-            })?;
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Bot record not found"))?;
 
         let chat = update
             .chat()
-            .ok_or_else(|| anyhow::anyhow!("Missing chat"))
-            .map_err(|err| {
-                cx.span().record_error(err.as_ref());
-                err
-            })?;
+            .ok_or_else(|| anyhow::anyhow!("Missing chat"))?;
 
-        if chat.id.0 == bot.target_chat_id {
-            self.handle_target_chat_message(&cx, bot, update).await
+        let client = self.new_bot_client(&bot.bot_token)?;
+
+        match if chat.id.0 == bot.target_chat_id {
+            self.handle_target_chat_message(bot, update.clone()).await
         } else {
-            self.handle_forward_message(&cx, bot, update).await
+            self.handle_forward_message(bot, update.clone()).await
+        } {
+            Err(err) => {
+                client
+                    .send_message(chat.id, format!("Error handling message: {}", err))
+                    .await?;
+            }
+            Ok(_) => {}
         }
-        .map_err(|err| {
-            cx.span().record_error(err.as_ref());
-            err
-        })
+
+        Ok(())
     }
 }
 
 impl ForwardingMessageService {
+    #[tracing::instrument(err)]
     async fn handle_forward_message(
         &self,
-        cx: &Context,
         bot_info: entities::pm_forwarding_bot::Model,
         update: Update,
     ) -> anyhow::Result<()> {
-        let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/services");
-        let cx = cx.with_span(
-            tracer
-                .span_builder("ForwardingMessageService.handle_forward_message")
-                .with_kind(SpanKind::Internal)
-                .start_with_context(&tracer, cx),
-        );
-
         let chat = update
             .chat()
-            .ok_or_else(|| {
-                cx.span().set_status(Status::Error {
-                    description: Cow::from("Missing chat"),
-                });
-                anyhow::anyhow!("Missing chat")
-            })?
+            .ok_or_else(|| anyhow::anyhow!("Missing chat"))?
             .clone();
+
+        let bot = self.new_bot_client(&bot_info.bot_token)?;
 
         match update.kind {
             UpdateKind::Message(ref message) => {
-                let txn = self.db.begin().await?;
-
-                // store message to database
-                let message_entity = entities::pm_forwarding_message::ActiveModel {
-                    bot_id: ActiveValue::Set(bot_info.id),
-                    telegram_chat_id: ActiveValue::Set(chat.id.0),
-                    telegram_message_id: ActiveValue::Set(message.id.0),
-                    ..Default::default()
+                if message.from().is_none() || message.from().unwrap().is_bot {
+                    log::debug!(
+                        "Ignoring message from chat {}, sender is unknown",
+                        chat.id.0
+                    );
+                    return Ok(());
                 }
-                .save(&txn)
-                .await
-                .map_err(|err| {
-                    cx.span().record_error(&err);
-                    err
-                })?;
+
+                if message.text().is_none() || message.text().unwrap().starts_with("/") {
+                    log::debug!("Ignoring command message from chat {}", chat.id.0);
+                    return Ok(());
+                }
 
                 // forward message to target chat
-                let api_url = self
-                    .settings
-                    .telegram_bot
-                    .clone()
-                    .unwrap()
-                    .api_url
-                    .unwrap_or("https://api.telegram.org/".into());
-                let bot = Bot::new(bot_info.bot_token).set_api_url(Url::parse(&api_url)?);
-                let msg = bot
+                let msg_forward = bot
                     .send_message(
                         ChatId(bot_info.target_chat_id),
                         combine_forwarding_content(
@@ -157,29 +127,20 @@ impl ForwardingMessageService {
                         ),
                     )
                     .parse_mode(teloxide::types::ParseMode::Html)
-                    .await
-                    .map_err(|err| {
-                        cx.span().record_error(&err);
-                        err
-                    })?;
+                    .await?;
 
-                // update message with forwarded message id
-                let mut message_active_model = message_entity.into_active_model();
-                message_active_model.forward_telegram_message_id = ActiveValue::Set(msg.id.0);
-                message_active_model.update(&txn).await.map_err(|err| {
-                    cx.span().record_error(&err);
-                    err
-                })?;
-
-                txn.commit().await.map_err(|err| {
-                    cx.span().record_error(&err);
-                    err
-                })?;
+                // store message to database
+                entities::pm_forwarding_message::ActiveModel {
+                    bot_id: ActiveValue::Set(bot_info.id),
+                    telegram_chat_id: ActiveValue::Set(chat.id.0),
+                    telegram_message_id: ActiveValue::Set(message.id.0),
+                    forward_telegram_message_id: ActiveValue::Set(msg_forward.id.0),
+                    ..Default::default()
+                }
+                .save(&self.db)
+                .await?;
             }
             _ => {
-                cx.span().set_status(Status::Error {
-                    description: Cow::from("Unsupported update kind"),
-                });
                 return Err(anyhow::anyhow!("Unsupported update kind"));
             }
         }
@@ -187,19 +148,13 @@ impl ForwardingMessageService {
         Ok(())
     }
 
+    #[tracing::instrument(err)]
     async fn handle_target_chat_message(
         &self,
-        cx: &Context,
         bot_info: entities::pm_forwarding_bot::Model,
-        update: teloxide::types::Update,
+        update: Update,
     ) -> anyhow::Result<()> {
-        let tracer = global::tracer("pegasus/rust-components/pm-bot-forwarding-handler/services");
-        let cx = cx.with_span(
-            tracer
-                .span_builder("ForwardingMessageService.handle_target_chat_message")
-                .with_kind(SpanKind::Internal)
-                .start_with_context(&tracer, cx),
-        );
+        let cx = Context::current();
 
         match update.kind {
             UpdateKind::Message(ref message) => {
@@ -207,12 +162,7 @@ impl ForwardingMessageService {
                 let reply_id = message
                     .reply_to_message()
                     .map(|msg| msg.id.0)
-                    .ok_or_else(|| {
-                        cx.span().set_status(Status::Error {
-                            description: Cow::from("Missing reply message"),
-                        });
-                        anyhow::anyhow!("Missing reply message")
-                    })?;
+                    .ok_or_else(|| anyhow::anyhow!("Missing reply message"))?;
 
                 // find original message
                 let message_entity = entities::pm_forwarding_message::Entity::find()
@@ -221,16 +171,8 @@ impl ForwardingMessageService {
                             .eq(reply_id),
                     )
                     .one(&self.db)
-                    .await
-                    .map_err(|err| {
-                        cx.span().record_error(&err);
-                        err
-                    })?
-                    .ok_or_else(|| anyhow::anyhow!("Message not found"))
-                    .map_err(|err| {
-                        cx.span().record_error(err.as_ref());
-                        err
-                    })?;
+                    .await?
+                    .ok_or_else(|| anyhow::anyhow!("Message not found"))?;
 
                 // reply to original message
                 bot.send_message(
@@ -243,16 +185,9 @@ impl ForwardingMessageService {
                     })?,
                 )
                 .reply_to_message_id(MessageId(message_entity.telegram_message_id))
-                .await
-                .map_err(|err| {
-                    cx.span().record_error(&err);
-                    err
-                })?;
+                .await?;
             }
             _ => {
-                cx.span().set_status(Status::Error {
-                    description: Cow::from("Unsupported update kind"),
-                });
                 return Err(anyhow::anyhow!("Unsupported update kind"));
             }
         }
@@ -265,12 +200,12 @@ fn combine_forwarding_content(from: &str, chat_id: i64, message_id: i32, text: &
     format!(
         r#"
         From: {}
-        Chat ID: <code>{}</code>
+        Chat ID: <a href="tg://user?id={}">{}</a>
         Message ID: <code>{}</code>
         
         {}
         "#,
-        from, chat_id, message_id, text
+        from, chat_id, chat_id, message_id, text
     )
     .lines()
     .map(|line| line.trim_start())

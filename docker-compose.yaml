@@ -71,8 +71,6 @@ services:
       - pegasus-network
     env_file:
       - .env
-    environment:
-      RUST_LOG: "info"
 
   pm-bot-forwarding-handler:
     image: pegasus-bot/pm-bot-forwarding-handler
@@ -83,10 +81,8 @@ services:
         COMPONENT: "pm-bot-forwarding-handler"
         PROFILE: "dev"
     deploy:
-      replicas: 3
+      replicas: 1
     networks:
       - pegasus-network
     env_file:
       - .env
-    environment:
-      RUST_LOG: "info"

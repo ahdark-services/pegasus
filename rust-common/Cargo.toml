@@ -19,7 +19,7 @@ opentelemetry-prometheus = "0.15"
 opentelemetry-semantic-conventions = "0.14"
 uuid = { version = "1.8", features = ["v4"] }
 teloxide = { workspace = true }
-redis = { workspace = true }
+redis = { workspace = true, features = ["aio", "tokio-comp"] }
 lapin = { workspace = true }
 log = { workspace = true }
 futures = { version = "0.3", features = ["default"] }
@@ -28,3 +28,7 @@ async-stream = "0.3"
 reqwest = "0.12"
 sea-orm = { workspace = true }
 chrono = { workspace = true }
+thiserror = "1.0"
+tracing = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+tracing-subscriber = { workspace = true }

@@ -6,7 +6,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Default, Debug)]
 pub struct Settings {
     pub namespace: String,
     pub version: String,
@@ -54,7 +54,7 @@ impl Settings {
     }
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseType {
     #[serde(rename = "postgres")]
@@ -67,7 +67,7 @@ pub enum DatabaseType {
     Sqlite,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseSSLMode {
     Disable,
@@ -79,7 +79,7 @@ pub enum DatabaseSSLMode {
     VerifyFull,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Database {
     #[serde(rename = "type")]
     pub database_type: DatabaseType,
@@ -93,7 +93,7 @@ pub struct Database {
     pub ssl_mode: Option<DatabaseSSLMode>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Mq {
     pub host: Option<String>,
     pub port: Option<u16>,
@@ -102,31 +102,31 @@ pub struct Mq {
     pub vhost: Option<String>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Observability {
     pub trace: Option<Trace>,
     pub metric: Option<Metric>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Metric {
     pub reader: Option<Reader>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub enum ReaderType {
     #[serde(rename = "prometheus")]
     Prometheus,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Reader {
     #[serde(rename = "type")]
     pub reader_type: Option<ReaderType>,
     pub listen: Option<String>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Trace {
     pub exporter: Exporter,
     pub batch_timeout: Option<String>,
@@ -136,7 +136,7 @@ pub struct Trace {
     pub sampling_ratio: Option<f64>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub enum ExporterType {
     #[serde(rename = "otlp-grpc")]
     OtlpGrpc,
@@ -144,7 +144,7 @@ pub enum ExporterType {
     OtlpHttp,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Exporter {
     #[serde(rename = "type")]
     pub exporter_type: Option<ExporterType>,
@@ -153,7 +153,7 @@ pub struct Exporter {
     pub insecure: Option<bool>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum RedisMode {
     Standalone,
@@ -161,7 +161,7 @@ pub enum RedisMode {
     Cluster,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Redis {
     pub mode: Option<RedisMode>,
     pub host: Option<String>,
@@ -171,21 +171,21 @@ pub struct Redis {
     pub db: Option<u8>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Server {
     pub network: Option<String>,
     pub address: Option<String>,
     pub port: Option<u16>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct TelegramBot {
     pub token: String,
     pub api_url: Option<String>,
     pub webhook: Option<Webhook>,
 }
 
-#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
 pub struct Webhook {
     pub url: Option<String>,
     pub max_connections: Option<i64>,
