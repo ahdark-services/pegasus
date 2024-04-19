@@ -66,11 +66,15 @@ impl IForwardingMessageService for ForwardingMessageService {
 
         let client = self.new_bot_client(&bot.bot_token)?;
 
-        match if chat.id.0 == bot.target_chat_id {
+        let r = if chat.id.0 == bot.target_chat_id {
             self.handle_target_chat_message(bot, update.clone()).await
-        } else {
+        } else if chat.is_private() {
             self.handle_forward_message(bot, update.clone()).await
-        } {
+        } else {
+            log::debug!("Ignoring message from chat {}", chat.id.0);
+            return Ok(());
+        };
+        match r {
             Err(err) => {
                 client
                     .send_message(chat.id, format!("Error handling message: {}", err))
