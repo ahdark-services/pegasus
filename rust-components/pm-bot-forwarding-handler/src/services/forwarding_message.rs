@@ -229,7 +229,7 @@ mod tests {
         let content = combine_forwarding_content(from, chat_id, message_id, text);
         assert_eq!(
             content,
-            "From: test\nChat ID: <code>123</code>\nMessage ID: <code>456</code>\n\ntest message"
+            "From: test\nChat ID: <a href=\"tg://user?id=123\">123</a>\nMessage ID: <code>456</code>\n\ntest message"
         );
     }
 }

@@ -1,6 +1,5 @@
 use actix_web::http::header::HeaderName;
 use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
-use opentelemetry::Context;
 
 use crate::services::forwarding_bot::{ForwardingBotService, IForwardingBotService};
 use crate::services::forwarding_message::{ForwardingMessageService, IForwardingMessageService};
