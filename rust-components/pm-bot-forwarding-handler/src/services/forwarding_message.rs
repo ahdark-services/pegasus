@@ -62,25 +62,40 @@ impl IForwardingMessageService for ForwardingMessageService {
 
         let chat = update
             .chat()
-            .ok_or_else(|| anyhow::anyhow!("Missing chat"))?;
+            .ok_or_else(|| anyhow::anyhow!("Missing chat"))?
+            .to_owned();
+
+        let message_id = match &update.kind {
+            UpdateKind::Message(m) => m.id,
+            _ => return Ok(()), // ignore non-message updates
+        };
 
         let client = self.new_bot_client(&bot.bot_token)?;
 
         let r = if chat.id.0 == bot.target_chat_id {
-            self.handle_target_chat_message(bot, update.clone()).await
+            self.handle_target_chat_message(bot, update).await
         } else if chat.is_private() {
-            self.handle_forward_message(bot, update.clone()).await
+            self.handle_forward_message(bot, update).await
         } else {
             log::debug!("Ignoring message from chat {}", chat.id.0);
             return Ok(());
         };
+
         match r {
             Err(err) => {
+                log::error!("Error handling message: {}, chat_id: {}", err, chat.id.0);
                 client
                     .send_message(chat.id, format!("Error handling message: {}", err))
+                    .reply_to_message_id(message_id)
                     .await?;
             }
-            Ok(_) => {}
+            Ok(_) => {
+                log::debug!("Message handled successfully, chat_id: {}", chat.id.0);
+                client
+                    .send_message(chat.id, "Message sent")
+                    .reply_to_message_id(message_id)
+                    .await?;
+            }
         }
 
         Ok(())
