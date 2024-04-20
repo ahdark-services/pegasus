@@ -402,9 +402,9 @@ pub async fn bot_reinitialize_handler(
     forwarding_bot_service: ForwardingBotService,
 ) -> anyhow::Result<()> {
     let parent_cx = update.cx.unwrap_or_default();
-    let app_root = span!(tracing::Level::INFO, "bot_reinitialize_handler");
-    app_root.set_parent(parent_cx);
-    let _guard = app_root.enter();
+    let span = span!(tracing::Level::INFO, "bot_reinitialize_handler");
+    span.set_parent(parent_cx);
+    let _guard = span.enter();
 
     let parent_msg = callback_query
         .message

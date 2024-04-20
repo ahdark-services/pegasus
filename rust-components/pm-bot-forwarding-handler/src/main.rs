@@ -26,6 +26,10 @@ async fn main() -> anyhow::Result<()> {
         settings::Settings::read_from_default_file().expect("Failed to read settings");
     observability::tracing::init_tracer(service_name, settings);
 
+    std::panic::set_hook(Box::new(|panic_info| {
+        log::error!("Panic occurred: {:?}", panic_info);
+    }));
+
     let amqp_conn = new_amqp_connection(settings).await;
     let db = database::init_conn(settings.database.as_ref().unwrap()).await?;
     let redis_client = redis::client::new_client(settings);
@@ -51,8 +55,8 @@ async fn main() -> anyhow::Result<()> {
     let run_bot = run(bot, listener, redis_storage, db, settings.clone());
     let run_web_server = HttpServer::new(move || {
         App::new()
-            .wrap(actix_web::middleware::Logger::default())
             .wrap(RequestTracing::default())
+            .wrap(actix_web::middleware::Logger::default())
             .app_data(actix_web::web::Data::new(forwarding_bot_service.clone()))
             .app_data(actix_web::web::Data::new(
                 forwarding_message_service.clone(),

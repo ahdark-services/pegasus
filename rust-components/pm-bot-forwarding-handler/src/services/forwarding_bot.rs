@@ -4,6 +4,7 @@ use reqwest::Url;
 use sea_orm::prelude::*;
 use sea_orm::ActiveValue;
 use teloxide::prelude::*;
+use tracing::span;
 
 use pegasus_common::database::entities;
 use pegasus_common::settings::Settings;
@@ -130,7 +131,16 @@ impl IForwardingBotService for ForwardingBotService {
             ..Default::default()
         }
         .insert(&self.db)
-        .await?;
+        .await
+        .map_err(|err| {
+            log::error!("Error creating bot record: {}", err);
+            err
+        })?;
+
+        self.initialize_bot(bot.id).await.map_err(|err| {
+            log::error!("Error initializing bot: {}", err);
+            err
+        })?;
 
         Ok(bot)
     }
@@ -145,8 +155,6 @@ impl IForwardingBotService for ForwardingBotService {
             .one(&self.db)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Bot not found"))?;
-
-        self.initialize_bot(bot.id).await?;
 
         Ok(bot)
     }
@@ -168,6 +176,15 @@ impl IForwardingBotService for ForwardingBotService {
             .await?
             .ok_or_else(|| anyhow::anyhow!("Bot record not found"))?;
 
+        let client = Bot::new(&bot.bot_token);
+        client
+            .log_out()
+            .await
+            .map_err(|err| {
+                log::error!("Error logging out bot: {}", err);
+            })
+            .ok();
+
         let client = self.new_bot_client(&bot.bot_token)?;
         client
             .set_webhook(Url::parse(&format!(
@@ -175,7 +192,11 @@ impl IForwardingBotService for ForwardingBotService {
                 bot.bot_token
             ))?)
             .secret_token(&bot.bot_webhook_secret)
-            .await?;
+            .await
+            .map_err(|err| {
+                log::error!("Error setting webhook: {}", err);
+                err
+            })?;
 
         Ok(())
     }
