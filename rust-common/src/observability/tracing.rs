@@ -22,7 +22,7 @@ pub fn init_tracer(service_name: &str, settings: &Settings) {
             .unwrap_or_default(),
         endpoint: format!(
             "{}{}",
-            if tracing_config.exporter.insecure.unwrap_or_default() {
+            if tracing_config.exporter.insecure.unwrap_or(true) {
                 "http://"
             } else {
                 "https://"
