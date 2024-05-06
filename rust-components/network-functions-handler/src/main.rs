@@ -13,27 +13,19 @@ mod handlers;
 mod run;
 mod utils;
 
-const SERVICE_NAME: &str = "network-functions-handler";
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    dotenv::dotenv().ok();
     pretty_env_logger::init();
-
-    let settings_path = match env::args().nth(1) {
-        Some(path) => {
-            log::info!("Using settings file: {}", path);
-            path.into()
-        }
-        None => env::current_dir().unwrap().join("config.yaml"),
-    };
-    let ref settings = settings::Settings::read_from_file(settings_path).unwrap();
-
-    observability::tracing::init_tracer(settings, SERVICE_NAME);
+    let service_name = env!("CARGO_BIN_NAME");
+    let ref settings =
+        settings::Settings::read_from_default_file().expect("Failed to read settings");
+    observability::tracing::init_tracer(service_name, settings);
 
     let amqp_conn = new_amqp_connection(settings).await;
 
     let bot = new_bot(settings.telegram_bot.as_ref().unwrap());
-    let listener = MqUpdateListener::new(SERVICE_NAME, amqp_conn, settings).await?;
+    let listener = MqUpdateListener::new(service_name, amqp_conn, settings).await?;
 
     log::info!("Application started");
 

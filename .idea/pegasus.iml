@@ -6,6 +6,8 @@
       <sourceFolder url="file://$MODULE_DIR$/rust-common/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rust-components/stickers-export-handler/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/rust-components/network-functions-handler/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/rust-components/pm-bot-forwarding-handler/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/rust-migration/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

@@ -2,13 +2,14 @@ FROM rust:1 as builder
 WORKDIR /usr/src/pegasus
 
 ARG COMPONENT
+ARG profile=release
 
 RUN rustup default nightly
 
 COPY . .
 
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    cargo build --release --bin ${COMPONENT}
+    cargo build --bin ${COMPONENT} --profile ${profile}
 
 FROM debian:bookworm-slim as runner
 WORKDIR /app

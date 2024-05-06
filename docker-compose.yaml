@@ -10,13 +10,12 @@ networks:
 services:
   bot-api-server:
     image: aiogram/telegram-bot-api
-    environment:
-      TELEGRAM_API_ID: ""
-      TELEGRAM_API_HASH: ""
     ports:
       - "8081:8081"
     networks:
       - pegasus-network
+    env_file:
+      - .env
 
   gateway:
     image: pegasus-bot/gateway
@@ -25,8 +24,6 @@ services:
       dockerfile: docker/basic/Dockerfile
       args:
         COMPONENT: "gateway"
-    ports:
-      - "8080:8080"
     networks:
       - pegasus-network
     env_file:
@@ -67,11 +64,25 @@ services:
       dockerfile: docker/rust-basic/Dockerfile
       args:
         COMPONENT: "network-functions-handler"
+        PROFILE: "dev"
     deploy:
       replicas: 3
     networks:
       - pegasus-network
     env_file:
       - .env
-    environment:
-      RUST_LOG: "info"
+
+  pm-bot-forwarding-handler:
+    image: pegasus-bot/pm-bot-forwarding-handler
+    build:
+      context: .
+      dockerfile: docker/rust-basic/Dockerfile
+      args:
+        COMPONENT: "pm-bot-forwarding-handler"
+        PROFILE: "dev"
+    deploy:
+      replicas: 1
+    networks:
+      - pegasus-network
+    env_file:
+      - .env

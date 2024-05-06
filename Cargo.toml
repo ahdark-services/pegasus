@@ -2,15 +2,23 @@
 resolver = "2"
 members = [
     "rust-common",
+    "rust-migration",
     "rust-components/*"
 ]
 
 [workspace.dependencies]
+pegasus-common = { path = "rust-common" }
+
 teloxide = { version = "0.12", features = ["macros", "redis-storage"], git = "https://github.com/AH-dark/teloxide.git", branch = "master" }
 log = "0.4"
 pretty_env_logger = "0.5"
 tokio = "1"
 serde = "1"
-opentelemetry = "0.22"
+opentelemetry = { version = "0.22", features = ["trace"] }
 redis = { version = "0.25", features = ["tokio"] }
 lapin = { version = "2.3", features = ["rustls"] }
+sea-orm = { version = "0.12", features = ["sqlx-postgres", "runtime-tokio-rustls"] }
+chrono = "0.4"
+tracing = "0.1"
+tracing-opentelemetry = { version = "0.23" }
+tracing-subscriber = { version = "0.3", features = ["registry", "env-filter"] }

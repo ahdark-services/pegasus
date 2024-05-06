@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use lapin::types::AMQPValue;
-use opentelemetry::trace::{SpanKind, TraceContextExt, Tracer};
 use opentelemetry::{global, Context};
 
 pub fn extract_span_from_delivery(delivery: &lapin::message::Delivery) -> Context {
@@ -34,13 +33,5 @@ pub fn extract_span_from_delivery(delivery: &lapin::message::Delivery) -> Contex
         propagator.extract(&trace_data_map)
     });
 
-    let tracer = global::tracer("pegasus/rust-common/bot/channel");
-    let span = tracer
-        .span_builder("UpdateListener::as_stream")
-        .with_kind(SpanKind::Consumer)
-        .start_with_context(&tracer, &parent_cx);
-
-    let cx = parent_cx.with_span(span);
-
-    cx
+    parent_cx
 }
